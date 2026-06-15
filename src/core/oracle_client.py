@@ -1,10 +1,44 @@
 import os
 from pathlib import Path
+import ctypes
 
 import oracledb
 
 
 DEFAULT_ORACLE_CLIENT_LIB_DIR = "./instantclient"
+
+
+def _is_ascii_path(path):
+    try:
+        str(path).encode("ascii")
+        return True
+    except UnicodeEncodeError:
+        return False
+
+
+def _windows_short_path(path):
+    if os.name != "nt":
+        return None
+
+    buffer = ctypes.create_unicode_buffer(1024)
+    result = ctypes.windll.kernel32.GetShortPathNameW(str(path), buffer, len(buffer))
+    if result == 0 or result >= len(buffer):
+        return None
+
+    short_path = buffer.value
+    if not short_path or not _is_ascii_path(short_path):
+        return None
+    return short_path
+
+
+def _oracle_client_init_path(client_path):
+    resolved_path = client_path.resolve()
+    if _is_ascii_path(resolved_path):
+        return str(resolved_path)
+    short_path = _windows_short_path(resolved_path)
+    if short_path:
+        return short_path
+    return str(resolved_path)
 
 
 def resolve_oracle_client_lib_dir(config=None):
@@ -35,8 +69,10 @@ def ensure_oracle_thick_mode(config=None):
             f"'{client_path}'. Configura ORACLE_CLIENT_LIB_DIR correctament."
         )
 
+    init_path = _oracle_client_init_path(client_path)
+
     try:
-        oracledb.init_oracle_client(lib_dir=str(client_path.resolve()))
+        oracledb.init_oracle_client(lib_dir=init_path)
     except Exception as exc:
         raise RuntimeError(
             "No s'ha pogut inicialitzar Oracle Thick Mode amb l'Oracle Instant Client a "
@@ -49,4 +85,4 @@ def ensure_oracle_thick_mode(config=None):
             f"l'Instant Client a '{client_path}'."
         )
 
-    return str(client_path.resolve())
+    return init_path

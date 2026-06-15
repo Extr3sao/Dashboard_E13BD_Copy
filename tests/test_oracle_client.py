@@ -23,6 +23,23 @@ class TestOracleClient(unittest.TestCase):
         oracledb_mock.init_oracle_client.assert_called_once_with(lib_dir=str(Path(tmpdir).resolve()))
         self.assertEqual(result, str(Path(tmpdir).resolve()))
 
+    @patch("src.core.oracle_client._windows_short_path", return_value="C:/SHORT/INSTAN~1")
+    @patch("src.core.oracle_client._is_ascii_path", side_effect=[False, True])
+    @patch("src.core.oracle_client.oracledb")
+    def test_ensure_oracle_thick_mode_uses_short_path_for_non_ascii_paths(
+        self,
+        oracledb_mock,
+        _is_ascii_path,
+        _windows_short_path,
+    ):
+        oracledb_mock.is_thin_mode.side_effect = [True, False]
+
+        with TemporaryDirectory() as tmpdir:
+            result = ensure_oracle_thick_mode({"ORACLE_CLIENT_LIB_DIR": tmpdir})
+
+        oracledb_mock.init_oracle_client.assert_called_once_with(lib_dir="C:/SHORT/INSTAN~1")
+        self.assertEqual(result, "C:/SHORT/INSTAN~1")
+
     @patch("src.core.oracle_client.oracledb")
     def test_ensure_oracle_thick_mode_rejects_missing_client_path(self, oracledb_mock):
         oracledb_mock.is_thin_mode.return_value = True
