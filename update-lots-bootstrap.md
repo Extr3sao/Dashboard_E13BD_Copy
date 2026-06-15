@@ -7,7 +7,7 @@ Publish the updated lots and schema mapping inventory through tracked bootstrap 
 - [x] Export local `schema_lots` and `master_lots` into `resources/bootstrap/initial_data.json` -> Verify JSON counts match local SQLite.
 - [x] Validate no local SQLite or secret files are staged -> Verify `git status --ignored` and staged names.
 - [x] Run focused mapping/bootstrap tests -> Verify pytest passes.
-- [ ] Commit and push to `origin/main` -> Verify remote head matches local commit.
+- [x] Commit and push to `origin/main` -> Verify remote head matches local commit.
 
 ## Done When
-- [ ] GitHub `main` contains the updated public lots and mapping bootstrap data.
+- [x] GitHub `main` contains the updated public lots and mapping bootstrap data.
