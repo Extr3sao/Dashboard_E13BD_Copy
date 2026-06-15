@@ -1,0 +1,67 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.venv314/
+.pydeps314/
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Node/Frontend
+node_modules/
+src/web-app/node_modules/
+src/web-app/dist/
+.npm
+.eslintcache
+
+# Databases & IDE
+.env
+!.env.example
+*.db
+*.sqlite3
+config/Cadena_conexions.txt
+.vscode/
+.idea/
+.DS_Store
+
+# Instant Client & Binaries
+instantclient/
+*.zip
+*.exe
+*.dll
+
+# Logs & Temp
+scratch/
+logs/
+backend_start*.log
+frontend_dev*.log
+*.log
+tmp/
+temp_copy.db
+out_*.txt
+out_*.json
+
+# Project specific ignores
+.old/
+....old/
+.agent/
+.playwright-cli/
+backup_audits/
+notebooklm_export/
+output/
+resources/automation_reports/
+resources/test_automation_reports/
+data/reports/
+resources/report_debug.pdf
+resources/bootstrap/*.local.json
+tmp_*/
+tmp-*
+tmp_*
+*.bak
+*.bak[0-9]*
+*.zip

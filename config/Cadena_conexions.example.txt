@@ -1,0 +1,53 @@
+# Plantilla de perfils Oracle.
+# Copia aquest fitxer com config/Cadena_conexions.txt i substitueix els valors.
+# El fitxer real config/Cadena_conexions.txt esta ignorat per Git per no publicar credencials.
+
+## E13BD
+USER = usuari_e13bd
+PASSWORD = contrasenya_e13bd
+DSN = host-e13bd:1521/servei_e13bd
+
+## E13DBA
+USER = usuari_e13dba
+PASSWORD = contrasenya_e13dba
+DSN = host-e13dba:1521/servei_e13dba
+
+## E13DBI
+USER = usuari_e13dbi
+PASSWORD = contrasenya_e13dbi
+DSN = host-e13dbi:1521/servei_e13dbi
+
+## BFGH_PRO
+USER = usuari_bfgh_pro
+PASSWORD = contrasenya_bfgh_pro
+DSN = host-bfgh-pro:1521/servei_bfgh_pro
+
+## BFGH_PRE
+USER = usuari_bfgh_pre
+PASSWORD = contrasenya_bfgh_pre
+DSN = host-bfgh-pre:1521/servei_bfgh_pre
+
+## BFGH_INT
+USER = usuari_bfgh_int
+PASSWORD = contrasenya_bfgh_int
+DSN = host-bfgh-int:1521/servei_bfgh_int
+
+## BFGH_TEST
+USER = usuari_bfgh_test
+PASSWORD = contrasenya_bfgh_test
+DSN = host-bfgh-test:1521/servei_bfgh_test
+
+## MITE MARDIADB_PRO
+USER = usuari_mite_mardiadb_pro
+PASSWORD = contrasenya_mite_mardiadb_pro
+DSN = host-mite-pro:1521/servei_mite_pro
+
+## MITE MARDIADB_PRE
+USER = usuari_mite_mardiadb_pre
+PASSWORD = contrasenya_mite_mardiadb_pre
+DSN = host-mite-pre:1521/servei_mite_pre
+
+## MITE MARDIADB_INT
+USER = usuari_mite_mardiadb_int
+PASSWORD = contrasenya_mite_mardiadb_int
+DSN = host-mite-int:1521/servei_mite_int

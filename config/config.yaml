@@ -1,0 +1,41 @@
+database:
+  type: "postgres"
+  mappings:
+    postgres:
+      size_query: "SELECT pg_total_relation_size(quote_ident(schemaname) || '.' || quote_ident(relname)) FROM pg_stat_user_tables;"
+    oracle:
+      size_query: "SELECT bytes FROM dba_segments WHERE owner = :owner AND segment_name = :table_name;"
+
+obsolescence_thresholds:
+  scoring:
+    size_weight: 0.3
+    last_access_weight: 0.4
+    dependencies_weight: 0.2
+    naming_pattern_weight: 0.1
+  recommendation:
+    keep: 30
+    review: 60
+    archive: 85
+    drop: 100
+
+naming_patterns:
+  - "tmp"
+  - "bak"
+  - "old"
+  - "stg"
+  - "temp"
+  - "backup"
+
+exclusions:
+  schemas:
+    - "information_schema"
+    - "pg_catalog"
+    - "sys"
+  tables:
+    - "spatial_ref_sys"
+
+paths:
+  inputs: "data/inputs"
+  snapshots: "data/snapshots"
+  reports: "data/reports"
+  logs: "logs"

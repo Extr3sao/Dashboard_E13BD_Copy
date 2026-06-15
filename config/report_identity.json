@@ -1,0 +1,38 @@
+{
+    "identity": {
+        "institution_name": "Generalitat de Catalunya",
+        "department_name": "Departament d'Educació i Formació Professional",
+        "application_name": "Auditoria Oracle E13BD"
+    },
+    "colors": {
+        "primary": "#0A4FB3",
+        "secondary": "#1e3a8a",
+        "accent": "#60a5fa",
+        "danger": "#ef4444",
+        "warning": "#f59e0b",
+        "success": "#22c55e",
+        "text_main": "#1f2937",
+        "text_light": "#6b7280",
+        "border": "#e5e7eb"
+    },
+    "style": {
+        "font_family": "Helvetica, Arial, sans-serif",
+        "font_size_base": "9pt",
+        "line_height": "1.5",
+        "summary_box_bg": "#f0f7ff",
+        "summary_box_border": "#0284c7"
+    },
+    "report_structure": {
+        "standard": [
+            {"id": "context", "title": "Context de l'Auditoria", "type": "context", "depth": 0},
+            {"id": "resum", "title": "Resum Executiu Global", "type": "summary", "depth": 0},
+            {"id": "diagnostic-ia", "title": "Anàlisi Intel·ligència Artificial", "type": "ai_diagnostic", "depth": 0, "conditional": "AI_IMPROVEMENT_PLAN"},
+            {"id": "detall-esquemes", "title": "Detall Analític per Esquema", "type": "schema_details", "depth": 0},
+            {"id": "matriu-risc", "title": "Matriu de Risc Institucional", "type": "risk_matrix", "depth": 0},
+            {"id": "properes-accions", "title": "Pla d'Acció i Properes Passes", "type": "action_plan", "depth": 0}
+        ]
+    },
+    "narrative_templates": {
+        "summary": "Aquest document recull els resultats de l'anàlisi realitzat sobre la infraestructura de dades Oracle. S'han considerat dimensions d'obsolescència, dependències creuades i activitat operativa per determinar la viabilitat dels esquemes actuals."
+    }
+}

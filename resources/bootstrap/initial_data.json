@@ -1,0 +1,162 @@
+{
+  "version": 1,
+  "description": "Public starter data loaded automatically on first run. It contains no passwords, Oracle connection strings or private SQLite files.",
+  "schema_lots": [
+    { "schema_name": "APP_CORE", "lot_name": "LOT_APP" },
+    { "schema_name": "APP_REPORTING", "lot_name": "LOT_APP" },
+    { "schema_name": "BATCH_CORE", "lot_name": "LOT_BATCH" },
+    { "schema_name": "DATA_MART", "lot_name": "LOT_DATA" },
+    { "schema_name": "MONITORING", "lot_name": "LOT_TIC" }
+  ],
+  "master_lots": [
+    {
+      "code": "LOT_APP",
+      "label": "Aplicacions",
+      "description": "Lot funcional per a esquemes d'aplicacio.",
+      "enabled": true
+    },
+    {
+      "code": "LOT_BATCH",
+      "label": "Batch",
+      "description": "Lot funcional per a processos batch i planificats.",
+      "enabled": true
+    },
+    {
+      "code": "LOT_DATA",
+      "label": "Dades",
+      "description": "Lot funcional per a reporting i dades.",
+      "enabled": true
+    },
+    {
+      "code": "LOT_TIC",
+      "label": "TIC",
+      "description": "Lot tecnic de seguiment intern.",
+      "enabled": true
+    }
+  ],
+  "delivery_config": {
+    "smtp_host": "",
+    "smtp_port": 587,
+    "smtp_username": "",
+    "smtp_password": "",
+    "smtp_use_tls": true,
+    "from_email": "",
+    "default_recipients": [],
+    "failure_notification_recipients": [],
+    "teams_webhook": "",
+    "sharepoint_site": "",
+    "sharepoint_library": "",
+    "sharepoint_folder": "",
+    "auto_purge_enabled": true,
+    "history_retention_days": 30,
+    "retry_retention_days": 30
+  },
+  "delivery_routes": {
+    "tic_summary_recipients": ["tic@example.com"],
+    "providers": [
+      {
+        "provider_code": "LOT_APP",
+        "label": "Aplicacions",
+        "emails": ["aplicacions@example.com"],
+        "enabled": true
+      },
+      {
+        "provider_code": "LOT_BATCH",
+        "label": "Batch",
+        "emails": ["batch@example.com"],
+        "enabled": true
+      },
+      {
+        "provider_code": "LOT_DATA",
+        "label": "Dades",
+        "emails": ["dades@example.com"],
+        "enabled": true
+      },
+      {
+        "provider_code": "LOT_TIC",
+        "label": "TIC",
+        "emails": ["tic@example.com"],
+        "enabled": true
+      }
+    ]
+  },
+  "delivery_templates": [
+    {
+      "template_key": "tic_summary",
+      "audience": "tic",
+      "subject_template": "[Oracle Audit] Resum TIC - {job_name} - {profile}",
+      "body_template": "Bon dia,\n\nS'ha executat l'auditoria automatica.\n\nPerfil: {profile}\nEstat: {status}\nTroballes: {findings}\nExecucio: {execution_id}\n\n{summary}\n\nSalutacions,\nSistema d'auditoria BBDD",
+      "enabled": true
+    },
+    {
+      "template_key": "provider_with_findings",
+      "audience": "provider",
+      "subject_template": "[Oracle Audit] {job_name} - {lot}",
+      "body_template": "Bon dia,\n\nS'ha executat l'auditoria automatica del lot {lot}.\n\nPerfil: {profile}\nEstat: {status}\nTroballes: {findings}\nExecucio: {execution_id}\n\nTrobareu el detall complet a l'informe adjunt.\n\nSalutacions,\nSistema d'auditoria BBDD",
+      "enabled": true
+    },
+    {
+      "template_key": "provider_without_findings",
+      "audience": "provider",
+      "subject_template": "[Oracle Audit] {job_name} - {lot} - sense troballes",
+      "body_template": "Bon dia,\n\nS'ha executat l'auditoria automatica del lot {lot} i no s'hi han detectat troballes.\n\nPerfil: {profile}\nExecucio: {execution_id}\n\nSalutacions,\nSistema d'auditoria BBDD",
+      "enabled": true
+    }
+  ],
+  "jobs": [
+    {
+      "name": "Post-CRQ setmanal per lots",
+      "enabled": false,
+      "audit_type": "post_crq_distribution",
+      "profile": "E13BD",
+      "schemas": ["APP_CORE", "APP_REPORTING", "BATCH_CORE", "DATA_MART"],
+      "checks": [],
+      "time_filter": { "mode": "preset", "preset": "weekly", "days_back": 7 },
+      "report_format": "pdf",
+      "schedule_type": "weekly",
+      "schedule_config": { "weekday": "monday", "time": "08:00" },
+      "job_config": {
+        "distribution": {
+          "mode": "lots"
+        },
+        "delivery": {
+          "targets": ["tic", "lots"],
+          "test_mode": true,
+          "override_recipients": []
+        },
+        "report_options": {
+          "include_summary": true,
+          "include_lot_reports": true
+        }
+      },
+      "timeout_seconds": 600,
+      "delivery_targets": [],
+      "severity_rules": []
+    },
+    {
+      "name": "Control mensual obsolets",
+      "enabled": false,
+      "audit_type": "obsolete_objects",
+      "profile": "E13BD",
+      "schemas": ["APP_CORE", "APP_REPORTING", "BATCH_CORE", "DATA_MART"],
+      "checks": [],
+      "time_filter": { "mode": "preset", "preset": "monthly", "days_back": 30 },
+      "report_format": "pdf",
+      "schedule_type": "monthly",
+      "schedule_config": { "day": 1, "time": "08:30" },
+      "job_config": {
+        "delivery": {
+          "targets": ["tic"],
+          "test_mode": true,
+          "override_recipients": []
+        },
+        "report_options": {
+          "include_summary": true
+        }
+      },
+      "timeout_seconds": 600,
+      "delivery_targets": [],
+      "severity_rules": []
+    }
+  ]
+}

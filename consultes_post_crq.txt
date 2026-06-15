@@ -1,0 +1,20 @@
+AUDITORIA POST-CRQ - CATÀLEG DE CONSULTES
+Font canònica executada pel motor: auditoria_post_crq.md
+
+CHECK_01 | TAULES RECENTS SENSE PRIMARY KEY | severitat base: Mitjà | paràmetres: days_back
+CHECK_02 | TAULES RECENTS SENSE ÍNDEXS | severitat base: Mitjà | paràmetres: days_back
+CHECK_04 | FOREIGN KEYS SENSE ÍNDEX DE SUPORT | severitat base: Crítica | paràmetres: days_back
+CHECK_05 | CONSTRAINTS DESHABILITADES | severitat base: CRÍTIC | paràmetres: days_back
+CHECK_06 | ÍNDEXS DUPLICATS RECENTS (MATEIXA COLUMNA LÍDER) | severitat base: Mitjà | paràmetres: days_back
+CHECK_07 | OBJECTES RECENTS INVÀLIDS | severitat base: Crític | paràmetres: start_at, end_at
+CHECK_08 | COLUMNES NUMBER SENSE PRECISIÓ NI ESCALA | severitat base: Baix | paràmetres: START_AT, END_AT
+CHECK_09 | SINÒNIMS RECENTS TRENCATS | severitat base: MITJA | paràmetres: days_back
+CHECK_10 | WHEN OTHERS THEN NULL EN CODI RECENT | severitat base: Crític | paràmetres: days_back
+CHECK_11 | PROBLEMES DE CODI EN PAQUETS/PROCEDURES/FUNCIONS | severitat base: Mitjà | paràmetres: days_back
+CHECK_12 | CANDIDATS PER A BULK COLLECT / CÀRREGA MASSIVA | severitat base: Mitjà | paràmetres: days_back
+
+Notes operatives:
+- La sortida visual de les incidències prioritzades es transforma al pipeline Python per mostrar principalment `OBJECTE`, `TIPUS` i `DADA TÈCNICA`.
+- La columna `severitat` es conserva al resultat cru del check per a la classificació interna, però no es mostra a la taula final de les incidències prioritzades.
+
+CHECK_03 | SEQÜÈNCIES SENSE CACHE | severitat base: Mitjà | paràmetres: start_at, end_at
