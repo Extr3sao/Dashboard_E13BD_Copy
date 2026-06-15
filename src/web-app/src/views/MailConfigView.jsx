@@ -433,15 +433,15 @@ export default function MailConfigView() {
               )}
             </div>
 
-            <div className="flex items-center justify-between gap-3">
-              <div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
                 <h5 className="text-sm font-bold uppercase tracking-wider opacity-70">Mapa proveïdor - correus</h5>
                 <p className="mt-1 text-xs text-muted-foreground">Cada codi de proveïdor correspon al `lot_code` detectat en el report Post-CRQ.</p>
               </div>
               <button
                 type="button"
                 onClick={addProviderRoute}
-                className="inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/15"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-primary/20 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/15 sm:w-auto"
               >
                 <Plus size={14} />
                 Afegir ruta
@@ -450,27 +450,27 @@ export default function MailConfigView() {
 
             <div className="flex flex-col gap-3">
               {(config.provider_routes || []).map((item, index) => (
-                <div key={`provider-route-${index}`} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1.2fr_1.8fr_auto_auto]">
+                <div key={`provider-route-${index}`} className="min-w-0 rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="grid min-w-0 grid-cols-1 gap-3 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1.7fr)_auto_auto]">
                     <input
                       value={item.provider_code}
                       onChange={e => updateProviderRoute(index, 'provider_code', e.target.value.toUpperCase())}
-                      className="rounded-xl border border-border bg-white/5 p-3 text-sm font-mono outline-none focus:ring-1 focus:ring-primary"
+                      className="min-w-0 rounded-xl border border-border bg-white/5 p-3 text-sm font-mono outline-none focus:ring-1 focus:ring-primary"
                       placeholder="LOT_APP"
                     />
                     <input
                       value={item.label}
                       onChange={e => updateProviderRoute(index, 'label', e.target.value)}
-                      className="rounded-xl border border-border bg-white/5 p-3 text-sm outline-none focus:ring-1 focus:ring-primary"
+                      className="min-w-0 rounded-xl border border-border bg-white/5 p-3 text-sm outline-none focus:ring-1 focus:ring-primary"
                       placeholder="Nom visible"
                     />
-                    <input
+                    <textarea
                       value={item.emails_text}
                       onChange={e => updateProviderRoute(index, 'emails_text', e.target.value)}
-                      className="rounded-xl border border-border bg-white/5 p-3 text-sm outline-none focus:ring-1 focus:ring-primary"
+                      className="min-h-[46px] min-w-0 resize-y rounded-xl border border-border bg-white/5 p-3 text-sm outline-none focus:ring-1 focus:ring-primary"
                       placeholder="proveidor@exemple.com, suport@exemple.com"
                     />
-                    <label className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm">
+                    <label className="inline-flex min-w-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm">
                       <input
                         type="checkbox"
                         checked={item.enabled}
