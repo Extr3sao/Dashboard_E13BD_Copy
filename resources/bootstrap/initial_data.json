@@ -2,36 +2,1273 @@
   "version": 1,
   "description": "Public starter data loaded automatically on first run. It contains no passwords, Oracle connection strings or private SQLite files.",
   "schema_lots": [
-    { "schema_name": "APP_CORE", "lot_name": "LOT_APP" },
-    { "schema_name": "APP_REPORTING", "lot_name": "LOT_APP" },
-    { "schema_name": "BATCH_CORE", "lot_name": "LOT_BATCH" },
-    { "schema_name": "DATA_MART", "lot_name": "LOT_DATA" },
-    { "schema_name": "MONITORING", "lot_name": "LOT_TIC" }
+    {
+      "schema_name": "AD",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "ADMCTRL",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "ADMINXTEC",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "ADMXTEC",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "ADSL",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "AIDA",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "AM10_38136279W",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "APEX_200200",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "APEX_SSO",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "AUDITORI",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "AUDSYS",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "AVA",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "BFGH_INT_LOCAL",
+      "lot_name": "AM11"
+    },
+    {
+      "schema_name": "BIPUBSCHED",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "CLIC",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "DBSFWUSER",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "DIRCENT",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "DUPLIXTEC",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_A4S",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_A6P",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_AAC_PREINS",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_ACO",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_ADPD",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_AFD",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_AGAI",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_AGD",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_AGIN",
+      "lot_name": "AM15"
+    },
+    {
+      "schema_name": "E13_AJUTS",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_APACTIU",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_APBLOE",
+      "lot_name": "AM11"
+    },
+    {
+      "schema_name": "E13_APD_0607",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_APE",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_APE_1011",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_APE_1112",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_APE_1213",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_ASAELE",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_ASD",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_ASD_PUBLI",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_ASI",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_AUP",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_AWA",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_BAE",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_BAG",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_BAL_HST",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_BAR",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_BOR",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_BOR2",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_BORPAS",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_BOR_CMO",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_BO_NICE",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_CAMPS",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_CAPCHA",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_CARNETDOCENT",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_CARTERA",
+      "lot_name": "AM15"
+    },
+    {
+      "schema_name": "E13_CAT_PROF",
+      "lot_name": "AM07"
+    },
+    {
+      "schema_name": "E13_CAT_SERVEIS",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_CED",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_CFP",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_CMD_GES",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_CMF",
+      "lot_name": "AM07"
+    },
+    {
+      "schema_name": "E13_CONSELLERIA",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_CONV",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_CONVOVT",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_CON_MENORS",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_CORALS",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_CSF",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_CWS",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_D1X1",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_DMA_ATIC",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_ECND",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_EDUCERCA",
+      "lot_name": "AM07"
+    },
+    {
+      "schema_name": "E13_EDUROAM",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_ENQ",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_ESE",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_ESPINA_BD",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_FDC",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_FIE",
+      "lot_name": "AM07"
+    },
+    {
+      "schema_name": "E13_FORMACIO",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_FORMACIO_GAF",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_FPPR",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_GAP",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_GCON",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_GCONV",
+      "lot_name": "AM15"
+    },
+    {
+      "schema_name": "E13_GEL",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_GESATIC",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_GESTILS",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_GESTIO_EDIFICI",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_GES_LOE",
+      "lot_name": "AM11"
+    },
+    {
+      "schema_name": "E13_GICARSM",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_GIN",
+      "lot_name": "AM15"
+    },
+    {
+      "schema_name": "E13_GRIP",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_GSA",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_GSA_AAC",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_GSA_ACR",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_GSA_AUC",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_GSA_CFI",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_GSA_CONF",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_GSA_EEM",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_GSA_EOI",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_GSA_GES",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_GSA_INS",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_GSA_NUCLI",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_GSA_PACF",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_GSA_RHA",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_GSA_UC",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_GSD_AJUTS",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_GSD_AVALDOC",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_GSD_CAT_CON",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_GSD_CMD",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_GSD_ESP",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_GSD_ESTIU",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_GSD_LLENGUES",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_GSD_LLICENCIES",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_GSD_LLICENCIES_D",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_GSD_MER",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_GSD_OPO",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_GSD_REL",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_GTE",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_GTE_ANE",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_GTE_CAT",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_GTE_PAS",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_GTO",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_GUAC",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_HST_A6P",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_HTE",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_IDA",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_ID_SUBSC",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_INAPDEP",
+      "lot_name": "AM15"
+    },
+    {
+      "schema_name": "E13_INSITU",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_INSPECCIO",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_JIRA",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_LLENGUES",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_LLICENCIES",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_MAPAES",
+      "lot_name": "AM07"
+    },
+    {
+      "schema_name": "E13_MAPAOE",
+      "lot_name": "AM07"
+    },
+    {
+      "schema_name": "E13_MAPAPRE",
+      "lot_name": "AM07"
+    },
+    {
+      "schema_name": "E13_MAPAPRO",
+      "lot_name": "AM07"
+    },
+    {
+      "schema_name": "E13_MBAE",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_MERLI",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_MERLI_CER",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_MERLI_DUC",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_MERLI_ORG",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_MFLEX",
+      "lot_name": "AM11"
+    },
+    {
+      "schema_name": "E13_MSG",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_MTC",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_NOV",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_OFERTA",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_OFERTA_BCK",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_OFE_EDU",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_OPO",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_OPOSPAS",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_ORAT",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_ORG_DEP",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_OTG",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_OVT_PUBLI",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_PAV",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_PAV_IAS",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_PAV_SIDENT",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_PCONV",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_PDA",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_PDCENTRE",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_PDP",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_PER",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_PFI",
+      "lot_name": "AM11"
+    },
+    {
+      "schema_name": "E13_PFI2",
+      "lot_name": "AM11"
+    },
+    {
+      "schema_name": "E13_PILE",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_PLD",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_POE",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_PPA",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_PPQPIS",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_PQPI",
+      "lot_name": "AM11"
+    },
+    {
+      "schema_name": "E13_PRACTICUM",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_PREMISCAT",
+      "lot_name": "AM15"
+    },
+    {
+      "schema_name": "E13_PUB",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_PUB_RESULTATS",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_QCEN",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_QESI",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_QEST_LLARS",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_QOF",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_QSI",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_RALC",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_RALC_DC",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_RALC_TEST",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_RECE",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_RESERVA_SALES",
+      "lot_name": "AM15"
+    },
+    {
+      "schema_name": "E13_RLE",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_RRHH",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_RTA",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_RTT",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_SCD",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_SGP",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_SHP",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_SIDIE",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_SII",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_SML",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_SOR",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_SSO_SM",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_SUPERVISIO",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_TIT",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_TME",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_UTILS",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "E13_VAD",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "E13_VAD_TSYSTEM",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "E13_VOL",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "EOICAMPUS",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "EQCAS",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "FINESTRETA",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "FLOWS_FILES",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "GAFADM",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "GAVIS",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "GCDE_ESTADISTICA",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "GEDAC",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "GEPSE",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "GGAA",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "GSMADMIN_INTERNAL",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "HPSM_IMP",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "IDI",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "INFOXTEC",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "INSPECCIO",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "INTRAPIEADM",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "INTRAPIEOAS",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "JHOMAR",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "JMARQUE4",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "JORGUE",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "LIDA",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "MIGR_ESQ",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "OBRES",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "OJVMSYS",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "ORDDATA",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "ORDS_METADATA",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "PAEC",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "PEBAC",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "PEBAX",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "PERGAM",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "PERGAM2",
+      "lot_name": "AM10"
+    },
+    {
+      "schema_name": "PUBLICACIONS",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "PUCADM",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "QV",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "REGISTREFOR",
+      "lot_name": "AM05"
+    },
+    {
+      "schema_name": "RESTAURA",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "RESTORE",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "SAGA_CENTRAL",
+      "lot_name": "AM11"
+    },
+    {
+      "schema_name": "SIENS_ADM",
+      "lot_name": "AM11"
+    },
+    {
+      "schema_name": "SIGMA",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "SIGMA2",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "SUPTEC",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "SUPTICADM",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "TAS000000016839",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "TSYSTEMS",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "UPLOAD",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "USAV",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "VFS_NICE_264",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "XDB",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "XT20_LIFERAY",
+      "lot_name": "SENSE LOT"
+    },
+    {
+      "schema_name": "XTEC_ALTES",
+      "lot_name": "SENSE LOT"
+    }
   ],
   "master_lots": [
     {
-      "code": "LOT_APP",
-      "label": "Aplicacions",
-      "description": "Lot funcional per a esquemes d'aplicacio.",
-      "enabled": true
+      "code": "AM05",
+      "label": "AM05",
+      "description": "",
+      "enabled": true,
+      "metadata": {
+        "backfill_source": "schema_lots",
+        "backfill_run_id": 1,
+        "schema_names": [
+          "E13_ADPD",
+          "E13_AFD",
+          "E13_AGAI",
+          "E13_AJUTS",
+          "E13_APE",
+          "E13_APE_1011",
+          "E13_APE_1112",
+          "E13_APE_1213",
+          "E13_ASD",
+          "E13_ASD_PUBLI",
+          "E13_BAR",
+          "E13_BOR",
+          "E13_BOR2",
+          "E13_BORPAS",
+          "E13_BOR_CMO",
+          "E13_CMD_GES",
+          "E13_ECND",
+          "E13_ESE",
+          "E13_FORMACIO",
+          "E13_FORMACIO_GAF",
+          "E13_FPPR",
+          "E13_GSD_AJUTS",
+          "E13_GSD_AVALDOC",
+          "E13_GSD_CAT_CON",
+          "E13_GSD_CMD",
+          "E13_GSD_ESP",
+          "E13_GSD_ESTIU",
+          "E13_GSD_LLENGUES",
+          "E13_GSD_LLICENCIES",
+          "E13_GSD_LLICENCIES_D",
+          "E13_GSD_MER",
+          "E13_GSD_OPO",
+          "E13_GSD_REL",
+          "E13_GTO",
+          "E13_INSPECCIO",
+          "E13_LLENGUES",
+          "E13_LLICENCIES",
+          "E13_NOV",
+          "E13_OFERTA",
+          "E13_OFERTA_BCK",
+          "E13_OPO",
+          "E13_OPOSPAS",
+          "E13_ORG_DEP",
+          "E13_PDA",
+          "E13_PER",
+          "E13_PLD",
+          "E13_PRACTICUM",
+          "E13_PUB",
+          "E13_PUB_RESULTATS",
+          "E13_RLE",
+          "E13_RRHH",
+          "E13_SOR",
+          "E13_SUPERVISIO",
+          "E13_VAD",
+          "E13_VOL",
+          "GAFADM",
+          "INSPECCIO",
+          "INTRAPIEADM",
+          "INTRAPIEOAS",
+          "REGISTREFOR"
+        ]
+      }
     },
     {
-      "code": "LOT_BATCH",
-      "label": "Batch",
-      "description": "Lot funcional per a processos batch i planificats.",
-      "enabled": true
+      "code": "AM07",
+      "label": "AM07",
+      "description": "",
+      "enabled": true,
+      "metadata": {
+        "backfill_source": "schema_lots",
+        "backfill_run_id": 1,
+        "schema_names": [
+          "E13_CAT_PROF",
+          "E13_CMF",
+          "E13_EDUCERCA",
+          "E13_FIE",
+          "E13_MAPAES",
+          "E13_MAPAOE",
+          "E13_MAPAPRE",
+          "E13_MAPAPRO"
+        ]
+      }
     },
     {
-      "code": "LOT_DATA",
-      "label": "Dades",
-      "description": "Lot funcional per a reporting i dades.",
-      "enabled": true
+      "code": "AM10",
+      "label": "AM10",
+      "description": "",
+      "enabled": true,
+      "metadata": {
+        "backfill_source": "schema_lots",
+        "backfill_run_id": 1,
+        "schema_names": [
+          "AD",
+          "ADMCTRL",
+          "ADMINXTEC",
+          "ADMXTEC",
+          "AIDA",
+          "AM10_38136279W",
+          "APEX_SSO",
+          "AVA",
+          "CLIC",
+          "E13_A4S",
+          "E13_A6P",
+          "E13_AAC_PREINS",
+          "E13_ACO",
+          "E13_AGD",
+          "E13_ASAELE",
+          "E13_AUP",
+          "E13_AWA",
+          "E13_BAE",
+          "E13_BAG",
+          "E13_BAL_HST",
+          "E13_CAMPS",
+          "E13_CAPCHA",
+          "E13_CARNETDOCENT",
+          "E13_CFP",
+          "E13_CORALS",
+          "E13_CSF",
+          "E13_CWS",
+          "E13_FDC",
+          "E13_GCON",
+          "E13_GEL",
+          "E13_GESTILS",
+          "E13_GSA",
+          "E13_GSA_AAC",
+          "E13_GSA_ACR",
+          "E13_GSA_AUC",
+          "E13_GSA_CFI",
+          "E13_GSA_CONF",
+          "E13_GSA_EEM",
+          "E13_GSA_EOI",
+          "E13_GSA_GES",
+          "E13_GSA_INS",
+          "E13_GSA_NUCLI",
+          "E13_GSA_PACF",
+          "E13_GSA_RHA",
+          "E13_GSA_UC",
+          "E13_GTE",
+          "E13_GTE_ANE",
+          "E13_GTE_CAT",
+          "E13_GTE_PAS",
+          "E13_GUAC",
+          "E13_HST_A6P",
+          "E13_HTE",
+          "E13_IDA",
+          "E13_ID_SUBSC",
+          "E13_MERLI",
+          "E13_MERLI_CER",
+          "E13_MERLI_DUC",
+          "E13_MERLI_ORG",
+          "E13_MSG",
+          "E13_MTC",
+          "E13_OFE_EDU",
+          "E13_ORAT",
+          "E13_OTG",
+          "E13_OVT_PUBLI",
+          "E13_PAV",
+          "E13_PAV_IAS",
+          "E13_PAV_SIDENT",
+          "E13_PDCENTRE",
+          "E13_POE",
+          "E13_PPA",
+          "E13_PPQPIS",
+          "E13_QCEN",
+          "E13_QESI",
+          "E13_QEST_LLARS",
+          "E13_QOF",
+          "E13_QSI",
+          "E13_RALC",
+          "E13_RECE",
+          "E13_RTA",
+          "E13_RTT",
+          "E13_SIDIE",
+          "E13_SII",
+          "E13_SML",
+          "E13_SSO_SM",
+          "E13_TME",
+          "E13_UTILS",
+          "EOICAMPUS",
+          "GAVIS",
+          "GCDE_ESTADISTICA",
+          "GEDAC",
+          "GEPSE",
+          "IDI",
+          "JHOMAR",
+          "JMARQUE4",
+          "JORGUE",
+          "LIDA",
+          "OBRES",
+          "PAEC",
+          "PEBAC",
+          "PEBAX",
+          "PERGAM",
+          "PERGAM2"
+        ]
+      }
     },
     {
-      "code": "LOT_TIC",
-      "label": "TIC",
-      "description": "Lot tecnic de seguiment intern.",
-      "enabled": true
+      "code": "AM11",
+      "label": "AM11",
+      "description": "",
+      "enabled": true,
+      "metadata": {
+        "backfill_source": "schema_lots",
+        "backfill_run_id": 1,
+        "schema_names": [
+          "BFGH_INT_LOCAL",
+          "E13_APBLOE",
+          "E13_GES_LOE",
+          "E13_MFLEX",
+          "E13_PFI",
+          "E13_PFI2",
+          "E13_PQPI",
+          "SAGA_CENTRAL",
+          "SIENS_ADM"
+        ]
+      }
+    },
+    {
+      "code": "AM15",
+      "label": "AM15",
+      "description": "",
+      "enabled": true,
+      "metadata": {
+        "backfill_source": "schema_lots",
+        "backfill_run_id": 1,
+        "schema_names": [
+          "E13_AGIN",
+          "E13_CARTERA",
+          "E13_GCONV",
+          "E13_GIN",
+          "E13_INAPDEP",
+          "E13_PREMISCAT",
+          "E13_RESERVA_SALES"
+        ]
+      }
     }
   ],
   "delivery_config": {
@@ -52,30 +1289,40 @@
     "retry_retention_days": 30
   },
   "delivery_routes": {
-    "tic_summary_recipients": ["tic@example.com"],
+    "tic_summary_recipients": [
+      "tic@example.com"
+    ],
     "providers": [
       {
         "provider_code": "LOT_APP",
         "label": "Aplicacions",
-        "emails": ["aplicacions@example.com"],
+        "emails": [
+          "aplicacions@example.com"
+        ],
         "enabled": true
       },
       {
         "provider_code": "LOT_BATCH",
         "label": "Batch",
-        "emails": ["batch@example.com"],
+        "emails": [
+          "batch@example.com"
+        ],
         "enabled": true
       },
       {
         "provider_code": "LOT_DATA",
         "label": "Dades",
-        "emails": ["dades@example.com"],
+        "emails": [
+          "dades@example.com"
+        ],
         "enabled": true
       },
       {
         "provider_code": "LOT_TIC",
         "label": "TIC",
-        "emails": ["tic@example.com"],
+        "emails": [
+          "tic@example.com"
+        ],
         "enabled": true
       }
     ]
@@ -109,18 +1356,33 @@
       "enabled": false,
       "audit_type": "post_crq_distribution",
       "profile": "E13BD",
-      "schemas": ["APP_CORE", "APP_REPORTING", "BATCH_CORE", "DATA_MART"],
+      "schemas": [
+        "APP_CORE",
+        "APP_REPORTING",
+        "BATCH_CORE",
+        "DATA_MART"
+      ],
       "checks": [],
-      "time_filter": { "mode": "preset", "preset": "weekly", "days_back": 7 },
+      "time_filter": {
+        "mode": "preset",
+        "preset": "weekly",
+        "days_back": 7
+      },
       "report_format": "pdf",
       "schedule_type": "weekly",
-      "schedule_config": { "weekday": "monday", "time": "08:00" },
+      "schedule_config": {
+        "weekday": "monday",
+        "time": "08:00"
+      },
       "job_config": {
         "distribution": {
           "mode": "lots"
         },
         "delivery": {
-          "targets": ["tic", "lots"],
+          "targets": [
+            "tic",
+            "lots"
+          ],
           "test_mode": true,
           "override_recipients": []
         },
@@ -138,15 +1400,29 @@
       "enabled": false,
       "audit_type": "obsolete_objects",
       "profile": "E13BD",
-      "schemas": ["APP_CORE", "APP_REPORTING", "BATCH_CORE", "DATA_MART"],
+      "schemas": [
+        "APP_CORE",
+        "APP_REPORTING",
+        "BATCH_CORE",
+        "DATA_MART"
+      ],
       "checks": [],
-      "time_filter": { "mode": "preset", "preset": "monthly", "days_back": 30 },
+      "time_filter": {
+        "mode": "preset",
+        "preset": "monthly",
+        "days_back": 30
+      },
       "report_format": "pdf",
       "schedule_type": "monthly",
-      "schedule_config": { "day": 1, "time": "08:30" },
+      "schedule_config": {
+        "day": 1,
+        "time": "08:30"
+      },
       "job_config": {
         "delivery": {
-          "targets": ["tic"],
+          "targets": [
+            "tic"
+          ],
           "test_mode": true,
           "override_recipients": []
         },
