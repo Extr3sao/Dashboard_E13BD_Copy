@@ -1278,7 +1278,9 @@
     "smtp_password": "",
     "smtp_use_tls": true,
     "from_email": "",
-    "default_recipients": [],
+    "default_recipients": [
+      "franciscovalladares@gencat.cat"
+    ],
     "failure_notification_recipients": [],
     "teams_webhook": "",
     "sharepoint_site": "",
@@ -1290,38 +1292,85 @@
   },
   "delivery_routes": {
     "tic_summary_recipients": [
-      "tic@example.com"
+      {
+        "email": "franciscovalladares@gencat.cat",
+        "enabled": true
+      },
+      {
+        "email": "joseasdrubal_ext@gencat.cat",
+        "enabled": true
+      },
+      {
+        "email": "ferran.elias@gencat.cat",
+        "enabled": true
+      }
     ],
     "providers": [
       {
-        "provider_code": "LOT_APP",
-        "label": "Aplicacions",
+        "provider_code": "AM05",
+        "label": "T-System",
         "emails": [
-          "aplicacions@example.com"
+          "joseasdrubal_ext@gencat.cat",
+          "franciscovalladares@gencat.cat",
+          "magdalena-maria.borras-fornos@t-systems.com"
         ],
         "enabled": true
       },
       {
-        "provider_code": "LOT_BATCH",
-        "label": "Batch",
+        "provider_code": "AM07",
+        "label": "Capgemini",
         "emails": [
-          "batch@example.com"
+          "joseasdrubal_ext@gencat.cat",
+          "franciscovalladares@gencat.cat",
+          "mariaelena.freile@capgemini.com"
         ],
         "enabled": true
       },
       {
-        "provider_code": "LOT_DATA",
-        "label": "Dades",
+        "provider_code": "AM10",
+        "label": "Ticxcat",
         "emails": [
-          "dades@example.com"
+          "joseasdrubal_ext@gencat.cat",
+          "franciscovalladares@gencat.cat",
+          "puc@ticxcat.cat"
         ],
         "enabled": true
       },
       {
-        "provider_code": "LOT_TIC",
-        "label": "TIC",
+        "provider_code": "AM11",
+        "label": "T-System",
         "emails": [
-          "tic@example.com"
+          "joseasdrubal_ext@gencat.cat",
+          "franciscovalladares@gencat.cat",
+          "juan-jose.fernandez-caro@t-systems.com"
+        ],
+        "enabled": true
+      },
+      {
+        "provider_code": "AM15",
+        "label": "Viewnext",
+        "emails": [
+          "joseasdrubal_ext@gencat.cat",
+          "franciscovalladares@gencat.cat",
+          "rgarciac@viewnext.com"
+        ],
+        "enabled": true
+      },
+      {
+        "provider_code": "PROVES",
+        "label": "Proves",
+        "emails": [
+          "joseasdrubal_ext@gencat.cat",
+          "franciscovalladares@gencat.cat"
+        ],
+        "enabled": true
+      },
+      {
+        "provider_code": "TIC",
+        "label": "ATIC",
+        "emails": [
+          "joseasdrubal_ext@gencat.cat",
+          "franciscovalladares@gencat.cat"
         ],
         "enabled": true
       }
@@ -1352,46 +1401,138 @@
   ],
   "jobs": [
     {
-      "name": "Post-CRQ setmanal per lots",
+      "name": "Proba_diaria",
       "enabled": false,
       "audit_type": "post_crq_distribution",
-      "profile": "E13BD",
-      "schemas": [
-        "APP_CORE",
-        "APP_REPORTING",
-        "BATCH_CORE",
-        "DATA_MART"
+      "profile": "E13DBA",
+      "schemas": [],
+      "checks": [
+        "CHECK_01",
+        "CHECK_02",
+        "CHECK_03",
+        "CHECK_04",
+        "CHECK_05",
+        "CHECK_06",
+        "CHECK_07",
+        "CHECK_08",
+        "CHECK_09",
+        "CHECK_10",
+        "CHECK_11",
+        "CHECK_12"
       ],
-      "checks": [],
       "time_filter": {
         "mode": "preset",
         "preset": "weekly",
-        "days_back": 7
+        "start_date": "",
+        "end_date": ""
       },
       "report_format": "pdf",
-      "schedule_type": "weekly",
+      "schedule_type": "daily",
       "schedule_config": {
-        "weekday": "monday",
-        "time": "08:00"
+        "start_at": "2026-06-16T08:00"
       },
       "job_config": {
-        "distribution": {
-          "mode": "lots"
+        "lot_scope": {
+          "mode": "all",
+          "selected_lots": []
         },
-        "delivery": {
-          "targets": [
-            "tic",
-            "lots"
-          ],
-          "test_mode": true,
-          "override_recipients": []
+        "send_policy": {
+          "send_only_with_findings": true,
+          "send_without_findings": true,
+          "record_without_findings": true
+        },
+        "email_template": {
+          "subject": "[Oracle Audit] {job_name} - {lot}",
+          "body": "Bon dia,\n\nS'ha executat correctament l'auditoria automatica del lot {lot}.\n\nResum de l'execucio\n- Perfil: {profile}\n- Lot: {lot}\n- Estat: {status}\n- Nombre de troballes: {findings}\n- Identificador d'execucio: {execution_id}\n\nObservacions\n{observations}\n\nLlegenda tecnica\n{technical_legend}\n\nTrobaras el detall complet a l'informe adjunt.\n\nSalutacions,\nSistema d'auditoria BBDD"
         },
         "report_options": {
           "include_summary": true,
           "include_lot_reports": true
+        },
+        "delivery": {
+          "targets": [
+            "lots",
+            "tic"
+          ],
+          "test_mode": true,
+          "override_recipients": [
+            "franciscovalladares@gencat.cat"
+          ]
+        },
+        "criticality_overrides": {},
+        "scheduler_options": {
+          "max_concurrency": 2,
+          "max_concurrency_upper_bound": 4,
+          "max_heavy_concurrency": 2,
+          "max_medium_concurrency": 2,
+          "max_light_concurrency": 2,
+          "max_retries": 1,
+          "enable_auto_throttle": true
         }
       },
-      "timeout_seconds": 600,
+      "timeout_seconds": 900,
+      "delivery_targets": [],
+      "severity_rules": []
+    },
+    {
+      "name": "setmanal",
+      "enabled": false,
+      "audit_type": "post_crq_distribution",
+      "profile": "E13DBA",
+      "schemas": [],
+      "checks": [
+        "CHECK_01",
+        "CHECK_02",
+        "CHECK_03",
+        "CHECK_04",
+        "CHECK_05",
+        "CHECK_06",
+        "CHECK_07",
+        "CHECK_08",
+        "CHECK_09",
+        "CHECK_10",
+        "CHECK_11",
+        "CHECK_12"
+      ],
+      "time_filter": {
+        "mode": "preset",
+        "preset": "weekly"
+      },
+      "report_format": "pdf",
+      "schedule_type": "weekly",
+      "schedule_config": {
+        "start_at": "2026-06-16T08:00"
+      },
+      "job_config": {
+        "lot_scope": {
+          "mode": "all",
+          "selected_lots": []
+        },
+        "send_policy": {
+          "send_only_with_findings": true,
+          "send_without_findings": false,
+          "record_without_findings": true
+        },
+        "email_template": {
+          "subject": "[Oracle Audit] {job_name} - {lot}",
+          "body": "Bon dia,\n\nS'ha executat correctament l'auditoria automatica del lot {lot}.\n\nResum de l'execucio\n- Perfil: {profile}\n- Lot: {lot}\n- Estat: {status}\n- Nombre de troballes: {findings}\n- Identificador d'execucio: {execution_id}\n\nObservacions\n{observations}\n\nLlegenda tecnica\n{technical_legend}\n\nTrobaras el detall complet a l'informe adjunt.\n\nSalutacions,\nSistema d'auditoria BBDD"
+        },
+        "report_options": {
+          "include_summary": true,
+          "include_lot_reports": true
+        },
+        "delivery": {
+          "targets": [
+            "lots",
+            "tic"
+          ],
+          "test_mode": false,
+          "override_recipients": []
+        },
+        "criticality_overrides": {},
+        "scheduler_options": {}
+      },
+      "timeout_seconds": 900,
       "delivery_targets": [],
       "severity_rules": []
     },
