@@ -282,6 +282,72 @@ $env:BOOTSTRAP_DATA_PATH='resources\bootstrap\initial_data.local.json'
 
 Els fitxers `resources/bootstrap/*.local.json` estan ignorats per Git per evitar publicar dades internes.
 
+#### SMTP i mapa de proveidors en una instal.lacio nova
+
+La configuracio real del servidor SMTP, contrasenyes i correus interns no es publica al repositori. Perque una instal.lacio nova ja arrenqui amb aquestes dades, crea el fitxer privat:
+
+```text
+resources/bootstrap/initial_data.local.json
+```
+
+Abans del primer `.\run.ps1`, omple'l amb una estructura com aquesta:
+
+```json
+{
+  "delivery_config": {
+    "smtp_host": "smtp.el_teu_servidor.cat",
+    "smtp_port": 587,
+    "smtp_username": "usuari",
+    "smtp_password": "contrasenya-privada",
+    "smtp_use_tls": true,
+    "from_email": "oracle-audit@gencat.cat",
+    "default_recipients": [
+      "destinatari@gencat.cat"
+    ],
+    "failure_notification_recipients": [
+      "avisos@gencat.cat"
+    ]
+  },
+  "delivery_routes": {
+    "tic_summary_recipients": [
+      "tic@gencat.cat"
+    ],
+    "providers": [
+      {
+        "provider_code": "AM05",
+        "label": "AM05",
+        "emails": [
+          "proveidor-am05@gencat.cat"
+        ],
+        "enabled": true
+      },
+      {
+        "provider_code": "AM07",
+        "label": "AM07",
+        "emails": [
+          "proveidor-am07@gencat.cat"
+        ],
+        "enabled": true
+      }
+    ]
+  }
+}
+```
+
+Despres executa:
+
+```powershell
+.\run.ps1
+```
+
+El primer arrencat carrega `resources/bootstrap/initial_data.json` i, si existeix, aplica despres `resources/bootstrap/initial_data.local.json` amb `force=True`. Si el PC ja havia arrencat abans i les bases locals ja existeixen, pots aplicar la capa privada igualment amb:
+
+```powershell
+python scripts\bootstrap_initial_data.py --data resources\bootstrap\initial_data.local.json --force
+```
+
+Mantingues aquest fitxer fora de Git: pot contenir password SMTP, correus interns i altres dades privades.
+
 ### Configuracio BBDD Oracle
 
 El repositori no publica credencials ni cadenes de connexio reals. Per aixo `config/Cadena_conexions.txt` esta ignorat per Git.
