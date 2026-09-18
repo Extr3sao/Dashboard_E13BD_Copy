@@ -149,7 +149,7 @@ async function runHappySmoke(page, mocks) {
 
   await logStep('run deep scan');
   await page.getByPlaceholder(/Ex: MGR_APP/i).fill('APP_USER');
-  await page.getByRole('button', { name: /^Auditar$/i }).click();
+  await page.getByRole('button', { name: /Iniciar Auditoria/i }).click();
   await verifyText(page, 'Detalls: APP_USER');
 
   await logStep('post-crq subtab');
@@ -318,7 +318,8 @@ async function runHappySmoke(page, mocks) {
 
   await logStep('rules subtab');
   await clickSubtab(page, 'Tasques i regles');
-  await verifyText(page, 'Regles de severitat i safata interna');
+  await verifyText(page, 'Regles globals');
+  await verifyText(page, 'Safata interna de tasques');
 
   await logStep('checks subtab');
   await clickSubtab(page, 'Gestió de controls');

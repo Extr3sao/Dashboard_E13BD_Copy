@@ -784,6 +784,10 @@ def _criticality_key(value: Any) -> str:
         return "CRITIC"
     if normalized == "mitja" or "mitj" in normalized or "med" in normalized:
         return "MITJA"
+    # Vocabulari del catàleg operational (auditoria_post_crq.md): ALT = severitat alta,
+    # STOPPER = bloquejant de desplegament; tots dos pertanyen al nivell superior.
+    if normalized == "alt" or "stopper" in normalized or "high" in normalized:
+        return "CRITIC"
     if normalized == "baix" or "low" in normalized:
         return "BAIX"
     return "BAIX"
@@ -815,7 +819,9 @@ def _resolve_check_criticality(check_id: str, overrides: Optional[Dict[str, Any]
     override_value = (overrides or {}).get(check_id)
     if override_value:
         return _criticality_key(override_value)
-    if default_severity:
+    # La severitat "N/A" (capçalera absent al catàleg markdown) no és una severitat real:
+    # cal deixar passar al mapa intern de defaults, no eclipsar-lo amb BAIX.
+    if default_severity and str(default_severity).strip().upper() not in {"", "N/A", "NA"}:
         return _criticality_key(default_severity)
     return _criticality_key(_default_check_criticality(check_id))
 
@@ -951,7 +957,7 @@ def _days_back_from_filter(
             "range_end_at": end_dt.isoformat(timespec="minutes"),
             "days_back": days_back,
             "resolved_on": today.isoformat(),
-            "resolved_at": reference_dt.isoformat(timespec="seconds"),
+            "resolved_at": reference_dt.isoformat(timespec="seconds") + "Z",
         }
 
     preset_days = {
@@ -972,7 +978,7 @@ def _days_back_from_filter(
         "range_end_at": reference_dt.isoformat(timespec="minutes"),
         "days_back": days_back,
         "resolved_on": today.isoformat(),
-        "resolved_at": reference_dt.isoformat(timespec="seconds"),
+        "resolved_at": reference_dt.isoformat(timespec="seconds") + "Z",
     }
 
 
@@ -3795,6 +3801,11 @@ def _run_single_post_crq_check(
         }
     except Exception as exc:
         duration_ms = int((time.perf_counter() - started) * 1000)
+        logger.warning(
+            "Post-CRQ check execution failed: check_id=%s error=%s",
+            check["check_id"],
+            exc,
+        )
         return {
             "check_id": check["check_id"],
             "title": check["title"],
@@ -3852,7 +3863,7 @@ def run_post_crq_audit(
         time_filter=normalized_filter,
         source_file=os.path.basename(path),
         source_path=path,
-        generated_at=execution_started_at.isoformat(timespec="seconds"),
+        generated_at=execution_started_at.isoformat(timespec="seconds") + "Z",
     )
     execution_plan = build_execution_plan(
         execution_context,
@@ -4059,7 +4070,7 @@ def run_post_crq_audit(
             "time_filter": normalized_filter,
             "source_file": os.path.basename(path),
             "source_path": path,
-            "generated_at": execution_started_at.isoformat(timespec="seconds"),
+            "generated_at": execution_started_at.isoformat(timespec="seconds") + "Z",
             "environment_message": _environment_message(profile),
             "scheduler": execution_plan["scheduler"],
         },
@@ -6876,9 +6887,10 @@ def build_post_crq_pdf_report(profile: str, report: Dict[str, Any]) -> bytes:
             return _build_post_crq_pdf_from_report_model_final_v7(profile, report_data)
         except Exception as exc:
             traceback.print_exc(file=sys.stderr)
-            print(
-                f"[post_crq_pdf] Falling back to safe PDF builder for profile={profile}: {exc}",
-                file=sys.stderr,
+            logger.warning(
+                "Falling back to safe post CRQ PDF builder for profile=%s: %s",
+                profile,
+                exc,
             )
             try:
                 return _build_post_crq_pdf_from_report_model_safe_fallback(profile, report_data)

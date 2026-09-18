@@ -93,8 +93,9 @@ def test_wrapped_sql_ignores_cte_aliases_in_current_check_01_sql():
         {"start_date": "2026-04-01", "end_date": "2026-04-07"},
     )
 
-    assert temporal_alias == "FECHA_MODIF"
+    assert temporal_alias == "DATA_MODIFICACIO_OBJECTE"
     assert time_pushed is False
+    assert 'post_crq_result."DATA_MODIFICACIO_OBJECTE"' not in wrapped_sql
     assert 'post_crq_result."START_DATE"' not in wrapped_sql
     assert 'post_crq_result."END_DATE"' not in wrapped_sql
 

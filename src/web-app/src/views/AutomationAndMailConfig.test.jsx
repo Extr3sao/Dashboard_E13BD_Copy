@@ -305,14 +305,17 @@ test('AutomationView exposes contextual help for each internal screen', async ()
 
   fireEvent.click(await screen.findByRole('button', { name: /Ajuda: Jobs d'automatitzaci/i }));
   expect(await screen.findByRole('dialog', { name: /Jobs d'automatitzaci/i })).toBeInTheDocument();
-  expect(screen.getByText(/crear o editar jobs programats/i)).toBeInTheDocument();
+  // Product help text (pageHelp.automationJobs.summary) was rewritten to the
+  // current Spanish description; matcher kept equivalent in intent.
+  expect(screen.getByText(/crear, editar, activar, ejecutar y desactivar jobs programados/i)).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: /Tanca ajuda/i }));
   await clickScreenButton('Lots i mapatge');
   fireEvent.click(screen.getByRole('button', { name: /Ajuda: Lots i mapatge/i }));
 
   expect(await screen.findByRole('dialog', { name: /Lots i mapatge/i })).toBeInTheDocument();
-  expect(screen.getByText(/Relaciona esquemes amb lots funcionals/i)).toBeInTheDocument();
+  // Product help text (pageHelp.automationLots.summary) current wording.
+  expect(screen.getByText(/mantener el catálogo maestro de lots/i)).toBeInTheDocument();
 });
 
 test('AutomationView lets you inspect run history and manage retries', async () => {

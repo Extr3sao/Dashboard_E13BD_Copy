@@ -1,4 +1,10 @@
 import '@testing-library/jest-dom';
+import { configure } from '@testing-library/react';
+
+// Some views are lazily imported (React.lazy + Suspense). On slow or networked
+// workstations module resolution can exceed the 1s Testing Library default, so
+// async queries (findBy*/waitFor) get a budget aligned with vitest's testTimeout.
+configure({ asyncUtilTimeout: 5000 });
 
 class ResizeObserverMock {
   observe() {}

@@ -24,6 +24,9 @@ src/web-app/dist/
 !.env.example
 *.db
 *.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
 config/Cadena_conexions.txt
 .vscode/
 .idea/
@@ -65,3 +68,11 @@ tmp_*
 *.bak
 *.bak[0-9]*
 *.zip
+# DEV Agent 4.5.1 — framework state is local runtime state, never product source.
+# Policy (devagent-integration.md): the whole state tree is ignored; evidence is
+# exported to docs/operations/devagent-evidence/ when governance requires it.
+.devagent/
+.da/
+.devagent.pre-framework-audit/
+.devagent.pre-framework-audit
+.freebuff/

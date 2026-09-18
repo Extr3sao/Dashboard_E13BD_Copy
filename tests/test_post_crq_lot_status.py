@@ -39,13 +39,25 @@ class TestPostCrqLotStatus(unittest.TestCase):
             connection.commit()
 
     def tearDown(self):
-        if os.path.exists(self.db_path):
-            for _ in range(5):
-                try:
-                    Path(self.db_path).unlink(missing_ok=True)
-                    break
-                except PermissionError:
-                    time.sleep(0.05)
+        # Cleanup local SQLite test artifacts so the repo never accumulates
+        # orphan test databases (regression guard for DEV Agent boundary).
+        # On Windows, open sqlite3 connections keep the file locked: release
+        # references, force GC and retry with a wider budget before giving up.
+        import gc
+        gc.collect()
+        for path in (
+            self.db_path,
+            f"{self.db_path}-journal",
+            f"{self.db_path}-wal",
+            f"{self.db_path}-shm",
+        ):
+            if os.path.exists(path):
+                for _ in range(20):
+                    try:
+                        Path(path).unlink(missing_ok=True)
+                        break
+                    except PermissionError:
+                        time.sleep(0.1)
 
     def test_con_hallazgos_when_lot_has_findings(self):
         report = build_report(

@@ -1111,7 +1111,8 @@ class TestReportGeneration(unittest.TestCase):
         self.assertIn("_v2.pdf", res.headers.get("content-disposition", ""))
         self.assertEqual(res.headers.get("x-post-crq-summary-version"), "v2")
         reader = PdfReader(io.BytesIO(res.content))
-        extracted = "\n".join(page.extract_text() or "" for page in reader.pages[:4])
+        # La capa v2 (Semàfor + Validacions) viu a l'annex final del PDF base+annex.
+        extracted = "\n".join(page.extract_text() or "" for page in reader.pages)
         self.assertIn("Semàfor executiu", extracted)
         self.assertIn("Validacions de coherència", extracted)
 

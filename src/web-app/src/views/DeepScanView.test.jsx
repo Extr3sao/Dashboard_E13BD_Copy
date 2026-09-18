@@ -87,6 +87,9 @@ test('DeepScanView allows switching schema cards and restoring scoring defaults'
       schemaToAudit="APP_USER"
       setSchemaToAudit={setSchemaToAudit}
       runDeepAudit={runDeepAudit}
+      // The audit button is disabled without a selected profile
+      // (disabled={isAuditing || !selectedProfile || !schemaToAudit}).
+      selectedProfile="E13BD"
       isAuditing={false}
       handleTestDeepConnection={handleTestDeepConnection}
       testStatusDeep={{ status: 'success', msg: 'Connexió OK' }}
@@ -101,13 +104,16 @@ test('DeepScanView allows switching schema cards and restoring scoring defaults'
   );
 
   expect(screen.getByDisplayValue('APP_USER')).toBeInTheDocument();
-  expect(await screen.findByText('Guia scoring mock')).toBeInTheDocument();
+  // ScoringGuide is lazy()-loaded; on slow IO the default 1s findBy timeout
+  // is not enough. Give the async chunk a bounded 5s window (FLAKY/ENV fix).
+  expect(await screen.findByText('Guia scoring mock', {}, { timeout: 5000 })).toBeInTheDocument();
   expect(screen.getByText(/Restaurar valors v4/i)).toBeInTheDocument();
 
   fireEvent.change(screen.getByDisplayValue('APP_USER'), { target: { value: 'app_stage' } });
   expect(setSchemaToAudit).toHaveBeenCalledWith('APP_STAGE');
 
-  fireEvent.click(screen.getByRole('button', { name: /Auditar/i }));
+  // Product button was renamed to "Iniciar Auditoria" (DeepScanView.jsx).
+  fireEvent.click(screen.getByRole('button', { name: /Iniciar Auditoria/i }));
   expect(runDeepAudit).toHaveBeenCalled();
 
   fireEvent.click(screen.getByRole('button', { name: /APP_AUX/i }));

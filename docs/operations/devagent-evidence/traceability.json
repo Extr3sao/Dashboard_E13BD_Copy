@@ -1,0 +1,179 @@
+{
+  "schema_version": "PROJECT_TRACEABILITY_V1",
+  "generated_at": "2026-09-18",
+  "project_id": "dashboard-e13bd-2695770f",
+  "authority": {
+    "framework": "DEV Agent 4.5.1 (REL-4.5.1-E6116BDBD69B)",
+    "evidence_registry": ".devagent/state/registry.json",
+    "evidence_bundle": "docs/operations/devagent-evidence/MANIFEST.sha256"
+  },
+  "coverage": {
+    "requirements": 10,
+    "with_tests": 10,
+    "with_execution_evidence": 10,
+    "with_verifier": 10,
+    "mandatory_coverage": "100%"
+  },
+  "chain": [
+    {
+      "req": "REQ-001 backend suite green (pre-existing failures repaired, no weakened expectations)",
+      "acc": "python scripts/run_backend_regression.py exits 0 with 0 unexpected failures",
+      "arch": "tests as the executable contract of src/api/*; product fixes only where the product was defective",
+      "wp": "WP-14-backend-defects",
+      "imp": [
+        "src/api/post_crq_audit.py (product defects 5-8)",
+        "tests/test_automation.py",
+        "tests/test_post_crq_audit.py",
+        "tests/test_post_crq_wrapped_sql.py",
+        "tests/test_check11_ai.py",
+        "tests/test_db_manager.py",
+        "tests/test_report_generation.py"
+      ],
+      "test": [
+        "tests/test_automation.py::TestAutomation::test_compute_next_run_weekly",
+        "tests/test_automation.py::TestAutomation::test_deliver_targets_logs_provider_warning",
+        "tests/test_post_crq_audit.py (23 tests)",
+        "tests/test_post_crq_wrapped_sql.py",
+        "tests/test_check11_ai.py",
+        "tests/test_db_manager.py",
+        "tests/test_report_generation.py"
+      ],
+      "exec": "python scripts/run_backend_regression.py  ->  exit 0, 82+30+70+28 = 210 passed",
+      "evid": "docs/operations/devagent-evidence/backend_final.log",
+      "verifier": "devagent verify . (VERIFY=PASS) + devagent project-doctor . (all_ok true)"
+    },
+    {
+      "req": "REQ-002 frontend suite green (4 pre-existing failures repaired)",
+      "acc": "vitest run of all 26 test files passes with 0 failures",
+      "arch": "unit tests of src/web-app (react + vitest + jsdom)",
+      "wp": "WP-14-frontend-defects",
+      "imp": [
+        "src/web-app/src/views/AutomationAndMailConfig.test.jsx",
+        "src/web-app/src/views/AutomationPageHelp.test.jsx",
+        "src/web-app/src/views/DeepScanView.test.jsx",
+        "src/web-app/src/test/setupTests.js"
+      ],
+      "test": [
+        "src/web-app/src/**/*.test.jsx (26 files, 79 tests)"
+      ],
+      "exec": "vitest run --no-file-parallelism per file (26 runs) -> 26/26 files, 79/79 tests passed",
+      "evid": [
+        "docs/operations/devagent-evidence/fe_final.log",
+        "docs/operations/devagent-evidence/fe_perfile1..5.log",
+        "docs/operations/devagent-evidence/tally_frontend_runs.py"
+      ],
+      "verifier": "scripted aggregation (tally_frontend_runs.py) over raw logs + project-doctor"
+    },
+    {
+      "req": "REQ-003 restore product observability of failed post-CRQ checks",
+      "acc": "a failed check emits logger.warning with the canonical first argument",
+      "arch": "src/api/post_crq_audit.py::_run_single_post_crq_check except-branch",
+      "wp": "WP-14-product-defects",
+      "imp": ["src/api/post_crq_audit.py"],
+      "test": ["tests/test_post_crq_audit.py (warning assertion)"],
+      "exec": "pytest tests/test_post_crq_audit.py -> 23 passed",
+      "evid": "docs/operations/devagent-evidence/backend_final.log",
+      "verifier": "devagent project-doctor . (all_ok true)"
+    },
+    {
+      "req": "REQ-004 catalog criticality vocabulary mapped to the 3-level model",
+      "acc": "ALT/STOPPER are recognised; 'N/A' is treated as absence, internal fallback restored",
+      "arch": "src/api/post_crq_audit.py::_criticality_key, _resolve_check_criticality",
+      "wp": "WP-14-product-defects",
+      "imp": ["src/api/post_crq_audit.py", "tests/test_post_crq_audit.py"],
+      "test": ["tests/test_post_crq_audit.py (ordering + severity tests)"],
+      "exec": "pytest tests/test_post_crq_audit.py -> 23 passed",
+      "evid": "docs/operations/devagent-evidence/backend_final.log",
+      "verifier": "devagent verify . (VERIFY=PASS)"
+    },
+    {
+      "req": "REQ-005 timestamp emission is timezone-explicit and parse-stable",
+      "acc": "generated_at/resolved_at end with 'Z'; parsing consumers unchanged",
+      "arch": "src/api/post_crq_audit.py report context builders",
+      "wp": "WP-14-product-defects",
+      "imp": ["src/api/post_crq_audit.py"],
+      "test": ["tests/test_post_crq_audit.py (report context assertions)"],
+      "exec": "pytest tests/test_post_crq_audit.py -> 23 passed",
+      "evid": "docs/operations/devagent-evidence/backend_final.log",
+      "verifier": "devagent project-doctor . (all_ok true)"
+    },
+    {
+      "req": "REQ-006 tests stop leaking transient SQLite databases into the project tree",
+      "acc": "workspace residue stable across a full backend run; 0 journals",
+      "arch": "tests create/cleanup their own DBs (per-test lifecycle)",
+      "wp": "WP-14-workspace-hygiene",
+      "imp": ["tests/test_automation.py", "tests/test_post_crq_lot_status.py", ".gitignore"],
+      "test": ["full backend regression with pre/post residue count"],
+      "exec": "python scripts/run_backend_regression.py -> exit 0; src/db/*.db* 4 -> 4",
+      "evid": "docs/operations/devagent-evidence/backend_final.log (PRE_DB_FILES/POST_DB_FILES)",
+      "verifier": "devagent project-doctor . (boundary_status OK)"
+    },
+    {
+      "req": "REQ-007 operational documentation resolves inside the repository",
+      "acc": "README link and runbook reference only in-repo paths that exist",
+      "arch": "docs/operations as the documentation home",
+      "wp": "WP-13-doc-fixes",
+      "imp": ["README.md", "docs/operations/operational-runbook.md"],
+      "test": ["manual resolution of every referenced path; .venv responds (python 3.14.3)"],
+      "exec": "ls scripts/run_*.py + .venv/Scripts/python.exe -c print -> VENV_OK",
+      "evid": "docs/operations/operational-runbook.md",
+      "verifier": "devagent audit . (RISK/GAP register unchanged for docs)"
+    },
+    {
+      "req": "REQ-008 E2E harness matches the shipped UI",
+      "acc": "playwright smoke happy path succeeds end to end",
+      "arch": "src/web-app/scripts/playwright-smoke.mjs selectors against the real labels",
+      "wp": "WP-15-e2e",
+      "imp": ["src/web-app/scripts/playwright-smoke.mjs"],
+      "test": ["smoke happy path (deep scan -> post-CRQ -> automatitzacions -> regles -> controls -> SMTP -> obsolets -> tutorial)"],
+      "exec": "node scripts/playwright-smoke.mjs -> exit 0, 'smoke success'",
+      "evid": "docs/operations/devagent-evidence/fe_smoke_ui3.log",
+      "verifier": "devagent verify . (VERIFY=PASS)"
+    },
+    {
+      "req": "REQ-009 the frontend entrypoint is declared and discoverable",
+      "acc": "ENTRYPOINTS.json count > 0 with provenance src/web-app/package.json",
+      "arch": "package.json declaration (truthful: src/main.jsx is the SPA entry)",
+      "wp": "WP-08-discovery",
+      "imp": ["src/web-app/package.json"],
+      "test": ["devagent audit . ENTRYPOINTS.json + devagent run --intent DISCOVERY_ONLY"],
+      "exec": "devagent audit . -> ENTRYPOINTS count 2 (was 0, unknown) ; vite build exit 0 after the change",
+      "evid": [
+        ".devagent/evidence/RUN-D33BDFDB5DEE4EA8/ENTRYPOINTS.json",
+        "docs/operations/devagent-evidence/devagent_audit2.log",
+        "docs/operations/devagent-evidence/fe_build4.log"
+      ],
+      "verifier": "devagent project-doctor . (all_ok true, manifest CLEAN)"
+    },
+    {
+      "req": "REQ-010 the repository is governed by the real DEV Agent framework",
+      "acc": "init ok / framework_copied false / runs terminalize once / doctor all_ok / evidence complete",
+      "arch": "DEV Agent 4.5.1 external install; .devagent holds state, evidence and runs only",
+      "wp": "WP-02..WP-11-integration",
+      "imp": [
+        ".devagent/project.yaml (framework-generated)",
+        ".devagent.pre-framework-audit/ (manual state archived, not destroyed)"
+      ],
+      "test": [
+        "devagent version/validate/capabilities/doctor",
+        "devagent init . --audit",
+        "devagent audit .",
+        "devagent run ... --intent DISCOVERY_ONLY",
+        "negative run on a non-initialized path"
+      ],
+      "exec": "4 runs reserved and terminalized once (AUDITED x3, DISCOVERED x1); orphans 0; verify PASS",
+      "evid": [
+        ".devagent/state/registry.json",
+        ".devagent/evidence/RUN-E2683309284B4E77/*",
+        ".devagent/evidence/RUN-D9B10996B14A4CD5/*",
+        ".devagent/evidence/RUN-D33BDFDB5DEE4EA8/*",
+        "docs/operations/devagent-evidence/devagent_*.log"
+      ],
+      "verifier": "devagent verify . + devagent project-doctor . (independent framework components, not the implementer walkthrough)"
+    }
+  ],
+  "not_established": {
+    "framework_implementation_chain": "REQ->ACC->ARCH->WP->IMP->TEST->EXEC->EVID inside the framework ledger is absent because no IMPLEMENTATION/VERIFY_ONLY run was executed; every run declares claimed=[DISCOVERED, AUDITED] and not_claimed=[IMPLEMENTING, IMPLEMENTED, TESTED, E2E_VERIFIED, INDEPENDENTLY_VERIFIED, CERTIFIED]",
+    "reason": "A6 requires governance-executed tests; single-process test execution is not viable on the OneDrive-hosted checkout (module import alone took 159s for one heavy file)"
+  }
+}

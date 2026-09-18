@@ -98,8 +98,8 @@ class TestCheck11AI(unittest.TestCase):
         self.assertFalse(analyze_mock.called)
         self.assertEqual(report["results_by_check"][0]["check_id"], "CHECK_12")
         self.assertEqual(dbm.executed_queries[0][1]["days_back"], 1)
-        self.assertIn(":start_date", dbm.executed_queries[0][0])
-        self.assertIn(":end_date", dbm.executed_queries[0][0])
+        self.assertIn(":start_at", dbm.executed_queries[0][0])
+        self.assertIn(":end_at", dbm.executed_queries[0][0])
         self.assertEqual(report["executed_checks"][0]["ai_analysis"]["status"], "skipped_no_rows")
 
     def test_check12_calls_ai_and_merges_structured_result(self):

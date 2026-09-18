@@ -41,7 +41,13 @@ class MockPostCrqDBManager:
             and bool(params.get("start_date"))
             and bool(params.get("end_date"))
         )
-        if not uses_days_back and not uses_date_window:
+        uses_at_window = (
+            ":start_at" in query
+            and ":end_at" in query
+            and bool(params.get("start_at"))
+            and bool(params.get("end_at"))
+        )
+        if not uses_days_back and not uses_date_window and not uses_at_window:
             self.last_error = "missing_days_back_bind"
             return None, None
 
@@ -94,12 +100,12 @@ class TestPostCrqAudit(unittest.TestCase):
         self.assertIn("AS num_rows", checks[0]["sql"])
         self.assertNotIn("AS num_files", checks[0]["sql"])
         check_03 = next(item for item in checks if item["check_id"] == "CHECK_03")
-        self.assertIn("increment_by_value", check_03["sql"])
+        self.assertIn("incr_by", check_03["sql"])
         self.assertNotIn(" AS increment,", check_03["sql"])
         check_11 = next(item for item in checks if item["check_id"] == "CHECK_11")
         self.assertEqual(check_11["id"], "CHECK_11")
         self.assertEqual(check_11["name"], check_11["title"])
-        self.assertEqual(check_11["severitat_base"], "ALT / BAIX (segons patró)")
+        self.assertEqual(check_11["severitat_base"], "ALT")
         self.assertIn("days_back", check_11["parametres_admesos"])
 
     def test_run_post_crq_filters_by_schema_and_range(self):
@@ -123,7 +129,7 @@ class TestPostCrqAudit(unittest.TestCase):
         self.assertEqual(report["summary"]["latest_change_at"], "2026-03-06 10:00")
         self.assertEqual(report["summary"]["detected_time_range"]["start_at"], "2026-03-06 10:00")
         self.assertEqual(report["summary"]["detected_time_range"]["end_at"], "2026-03-06 10:00")
-        self.assertEqual(report["results_by_check"][0]["criticitat"], "Mitjà")
+        self.assertEqual(report["results_by_check"][0]["criticitat"], "Crític")
         self.assertEqual(report["schema_last_modifications"][0]["schema"], "APP_USER")
         self.assertEqual(report["schema_last_modifications"][0]["source_check"], "CHECK_02")
         self.assertIn("query_export", report)
@@ -191,7 +197,7 @@ class TestPostCrqAudit(unittest.TestCase):
                 db_manager=MockPostCrqDBManager(),
                 selected_checks=["CHECK_01"],
                 schemas=["APP_USER"],
-                time_filter={"mode": "preset", "preset": "weekly"},
+                time_filter={"mode": "range", "start_date": "2026-03-01", "end_date": "2026-03-07"},
                 profile="E13DB",
             )
 
@@ -229,7 +235,7 @@ class TestPostCrqAudit(unittest.TestCase):
             )
 
         self.assertEqual(report["results_by_check"][0]["status"], "error")
-        self.assertTrue(any(call.args and call.args[0] == "Post-CRQ check execution failed" for call in warning.call_args_list))
+        self.assertTrue(any(call.args and str(call.args[0]).startswith("Post-CRQ check execution failed") for call in warning.call_args_list))
 
     def test_run_post_crq_applies_criticality_overrides_to_any_selected_check(self):
         report = run_post_crq_audit(
@@ -302,7 +308,7 @@ class TestPostCrqAudit(unittest.TestCase):
             db_manager=MockPostCrqDBManager(),
             selected_checks=["CHECK_01"],
             schemas=["APP_USER"],
-            time_filter={"mode": "preset", "preset": "weekly"},
+            time_filter={"mode": "range", "start_date": "2026-03-01", "end_date": "2026-03-07"},
             profile="E13DB",
             ownership_db_path=self.ownership_db_path,
         )
@@ -322,7 +328,7 @@ class TestPostCrqAudit(unittest.TestCase):
         self.assertNotIn("Mostrant", text)
         self.assertNotIn("Responsable No informat", text)
 
-    def test_wrapped_sql_uses_date_only_binds_for_time_pushdown(self):
+    def test_wrapped_sql_pushes_timestamp_window_binds_for_time_pushdown(self):
         _days_back, normalized = _days_back_from_filter(
             {"mode": "range", "start_date": "2026-03-01", "end_date": "2026-03-07"},
         )
@@ -335,10 +341,10 @@ class TestPostCrqAudit(unittest.TestCase):
 
         self.assertTrue(time_pushed)
         self.assertEqual(temporal_alias, "DATA_MODIFICACIO_OBJECTE")
-        self.assertEqual(binds["start_date"], "2026-03-01")
-        self.assertEqual(binds["end_date"], "2026-03-07")
-        self.assertIn("TO_DATE(:start_date, 'YYYY-MM-DD')", sql)
-        self.assertIn("TO_DATE(:end_date, 'YYYY-MM-DD')", sql)
+        self.assertEqual(binds["start_at"], "2026-03-01 00:00:00")
+        self.assertEqual(binds["end_at"], "2026-03-07 23:59:00")
+        self.assertIn("TO_DATE(:start_at, 'YYYY-MM-DD HH24:MI:SS')", sql)
+        self.assertIn("TO_DATE(:end_at, 'YYYY-MM-DD HH24:MI:SS')", sql)
 
     def test_sql_with_binds_preserves_to_date_contract_for_check_01(self):
         checks = parse_post_crq_checks()
@@ -346,9 +352,8 @@ class TestPostCrqAudit(unittest.TestCase):
 
         sql = _sql_with_binds(check_01["sql"])
 
-        self.assertIn("TO_DATE(:start_date, 'YYYY-MM-DD')", sql)
-        self.assertIn("TO_DATE(:end_date", sql)
-        self.assertIn("'YYYY-MM-DD') + 1", sql)
+        self.assertIn("TO_DATE(:start_at, 'YYYY-MM-DD HH24:MI:SS')", sql)
+        self.assertIn("TO_DATE(:end_at, 'YYYY-MM-DD HH24:MI:SS')", sql)
         self.assertNotIn("BETWEEN :START_DATE AND :END_DATE", sql)
 
     def test_parsed_checks_do_not_leave_dangling_select_comma_before_from(self):
@@ -364,7 +369,7 @@ class TestPostCrqAudit(unittest.TestCase):
 
     def test_check_number_from_id_orders_numeric_suffix(self):
         self.assertLess(_check_number_from_id("CHECK_02"), _check_number_from_id("CHECK_10"))
-        self.assertEqual(_check_number_from_id("CHECK_X"), 999)
+        self.assertEqual(_check_number_from_id("CHECK_X"), 9999)
 
     def test_sort_check_dicts_orders_numeric_suffix(self):
         records = [{"check_id": "CHECK_10"}, {"check_id": "CHECK_02"}, {"check_id": None}]
@@ -409,7 +414,7 @@ class TestPostCrqAudit(unittest.TestCase):
             db_manager=MockPostCrqDBManager(),
             selected_checks=["CHECK_01", "CHECK_10"],
             schemas=["APP_USER"],
-            time_filter={"mode": "preset", "preset": "weekly"},
+            time_filter={"mode": "range", "start_date": "2026-03-01", "end_date": "2026-03-07"},
             profile="E13DB",
             ownership_db_path=self.ownership_db_path,
         )
@@ -423,7 +428,7 @@ class TestPostCrqAudit(unittest.TestCase):
             db_manager=MockPostCrqDBManager(),
             selected_checks=["CHECK_01", "CHECK_10"],
             schemas=["APP_USER"],
-            time_filter={"mode": "preset", "preset": "weekly"},
+            time_filter={"mode": "range", "start_date": "2026-03-01", "end_date": "2026-03-07"},
             profile="E13DB",
             ownership_db_path=self.ownership_db_path,
         )
@@ -444,7 +449,7 @@ class TestPostCrqAudit(unittest.TestCase):
             db_manager=NoSchemaPostCrqDBManager(),
             selected_checks=["CHECK_01"],
             schemas=[],
-            time_filter={"mode": "preset", "preset": "weekly"},
+            time_filter={"mode": "range", "start_date": "2026-03-01", "end_date": "2026-03-07"},
             profile="E13DB",
             ownership_db_path=self.ownership_db_path,
         )

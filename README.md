@@ -343,7 +343,7 @@ npm run dev
 
 Runbook operatiu curt:
 
-- [operational-runbook.md](C:\Users\45485456N\OneDrive%20-%20Generalitat%20de%20Catalunya\.....Antigravity\Dashboard%20E13BD\operational-runbook.md)
+- [operational-runbook.md](docs/operations/operational-runbook.md)
 
 Frontend, des de `src/web-app`:
 

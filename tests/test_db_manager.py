@@ -100,18 +100,18 @@ class TestOracleDBManager(unittest.TestCase):
         sql = _sql_with_binds(check["sql"])
 
         params = {
-            "START_DATE": "2026-03-24",
-            "start_date": "2026-03-24",
-            "END_DATE": "2026-03-25",
-            "end_date": "2026-03-25",
+            "START_AT": "2026-03-24 00:00:00",
+            "start_at": "2026-03-24 00:00:00",
+            "END_AT": "2026-03-25 23:59:00",
+            "end_at": "2026-03-25 23:59:00",
             "DAYS_BACK": 1,
             "days_back": 1,
         }
 
         safe = OracleDBManager._filter_params_for_query(sql, params)
 
-        self.assertEqual(safe["start_date"], "2026-03-24")
-        self.assertEqual(safe["end_date"], "2026-03-25")
+        self.assertEqual(safe["start_at"], "2026-03-24 00:00:00")
+        self.assertEqual(safe["end_at"], "2026-03-25 23:59:00")
         self.assertNotIn("MI", safe)
 
     def test_filter_params_for_query_ignores_comments_with_apostrophes_in_check_06(self):
@@ -119,18 +119,18 @@ class TestOracleDBManager(unittest.TestCase):
         sql = _sql_with_binds(check["sql"])
 
         params = {
-            "START_DATE": "2026-03-24",
-            "start_date": "2026-03-24",
-            "END_DATE": "2026-03-25",
-            "end_date": "2026-03-25",
+            "START_AT": "2026-03-24 00:00:00",
+            "start_at": "2026-03-24 00:00:00",
+            "END_AT": "2026-03-25 23:59:00",
+            "end_at": "2026-03-25 23:59:00",
             "DAYS_BACK": 1,
             "days_back": 1,
         }
 
         safe = OracleDBManager._filter_params_for_query(sql, params)
 
-        self.assertEqual(safe["start_date"], "2026-03-24")
-        self.assertEqual(safe["end_date"], "2026-03-25")
+        self.assertEqual(safe["start_at"], "2026-03-24 00:00:00")
+        self.assertEqual(safe["end_at"], "2026-03-25 23:59:00")
         self.assertNotIn("MI", safe)
 
 

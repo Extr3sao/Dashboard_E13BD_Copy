@@ -272,13 +272,37 @@ def sample_post_crq_distribution_report_with_generation_errors():
 class TestAutomation(unittest.TestCase):
     def setUp(self):
         unique_path = f"src/db/test_automation_{int(time.time() * 1000000)}.db"
+        self.db_path = unique_path
         self.store = AutomationStore(unique_path)
         self.loader = DummyConfigLoader()
         self.reports_dir = "resources/test_automation_reports"
         os.makedirs(self.reports_dir, exist_ok=True)
 
+    def tearDown(self):
+        # Cleanup local SQLite test artifacts so the repo never accumulates
+        # orphan test databases (regression guard for DEV Agent boundary).
+        # On Windows, open sqlite3 connections keep the file locked: release
+        # references, force GC and retry with a wider budget before giving up.
+        import gc
+        gc.collect()
+        for path in (self.db_path, f"{self.db_path}-journal", f"{self.db_path}-wal", f"{self.db_path}-shm"):
+            if os.path.exists(path):
+                for _ in range(20):
+                    try:
+                        os.unlink(path)
+                        break
+                    except PermissionError:
+                        time.sleep(0.1)
+
     def test_compute_next_run_weekly(self):
-        next_run = compute_next_run("weekly", {"start_at": "2026-03-01T10:00"}, now=None)
+        # TIME_DEPENDENT fix: the weekly schedule semantics are relative to
+        # "now"; pin the clock near start_at so the assertion is deterministic
+        # regardless of the wall-clock date (start_at 2026-03-01 + 1 week).
+        next_run = compute_next_run(
+            "weekly",
+            {"start_at": "2026-03-01T10:00"},
+            now=dt.datetime(2026, 3, 1, 10, 5),
+        )
         self.assertTrue(str(next_run).startswith("2026-03-"))
 
     def test_compute_next_run_interprets_datetime_local_in_local_timezone(self):
@@ -1107,7 +1131,16 @@ class TestAutomation(unittest.TestCase):
 
         service = AutomationService(self.store, self.loader, reports_dir=self.reports_dir)
         lot_execution = {
-            "job_config": {"report_options": {"include_summary": False}},
+            # TEST_DEFECT fix: provider delivery is opt-in via
+            # job_config["delivery"]["targets"] (see
+            # _resolve_distribution_delivery). Without "lots" the delivery loop
+            # skips every item before attempting an email, so the failure path
+            # this test exercises (provider delivery failure -> WARNING log) is
+            # never reached.
+            "job_config": {
+                "report_options": {"include_summary": False},
+                "delivery": {"targets": ["lots"]},
+            },
             "routes": self.store.get_delivery_routes(),
             "items": [
                 {
