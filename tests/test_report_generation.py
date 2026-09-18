@@ -1098,8 +1098,14 @@ class TestReportGeneration(unittest.TestCase):
         extracted = "\n".join(page.extract_text() or "" for page in reader.pages)
         self.assertIn("Resum executiu", extracted)
 
+    # Same hermetic wiring as test_generate_post_crq_manual_general_report above:
+    # the profile/connections come from a fake dict so the test never depends on
+    # a host-local config/Cadena_conexions.txt (bootstrap artifact, not source).
     @patch("src.api.main.run_post_crq_audit")
-    def test_generate_post_crq_manual_general_report_v2(self, run_post_crq_mock):
+    @patch("src.api.main.OracleDBManager")
+    @patch("src.api.main.config_loader.resolve_profile_name", side_effect=lambda requested, profiles: requested or "E13DB")
+    @patch("src.api.main.config_loader.load_connections", return_value={"E13DB": {"USER": "demo"}})
+    def test_generate_post_crq_manual_general_report_v2(self, _load_connections, _resolve_profile, _db_manager, run_post_crq_mock):
         run_post_crq_mock.return_value = _build_multi_lot_experimental_payload()["data"]
 
         res = self.client.post(

@@ -57,6 +57,10 @@ beforeEach(() => {
   };
 });
 
+// Explicit budget: this test renders the whole heavy AutomationView tree and
+// switches tabs twice, so under a fully parallel `npm test` run the default
+// 15s budget is occasionally exceeded by rendering contention alone. The
+// assertions are unchanged; only the wall-clock allowance is explicit.
 test('AutomationView shows contextual help for jobs and lots screens', async () => {
   render(<AutomationView profiles={['E13DB']} />);
 
@@ -73,4 +77,4 @@ test('AutomationView shows contextual help for jobs and lots screens', async () 
   expect(await screen.findByRole('dialog', { name: /Lots i mapatge/i })).toBeInTheDocument();
   // Product help text (pageHelp.automationLots.summary) current wording.
   expect(screen.getByText(/mantener el catálogo maestro de lots/i)).toBeInTheDocument();
-});
+}, 60000);

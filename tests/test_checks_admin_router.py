@@ -594,7 +594,12 @@ class TestChecksAdminRouter(unittest.TestCase):
             "explicacio_check_text": "## CHECK_01",
         }
 
+        # The preview path builds a real OracleDBManager (which mandates Oracle
+        # Thick Mode + Instant Client). The test never connects to Oracle, so the
+        # manager is patched to keep the test hermetic on any machine.
         with patch("src.api.checks_admin_router._resolve_oracle_profile", return_value=("E13DB", {"USER": "u"})), patch(
+            "src.api.checks_admin_router.OracleDBManager",
+        ), patch(
             "src.api.checks_admin_router._run_single_post_crq_check",
             return_value=validation_payload,
         ), patch(
@@ -635,6 +640,8 @@ class TestChecksAdminRouter(unittest.TestCase):
         }
 
         with patch("src.api.checks_admin_router._resolve_oracle_profile", return_value=("E13DB", {"USER": "u"})), patch(
+            "src.api.checks_admin_router.OracleDBManager",
+        ), patch(
             "src.api.checks_admin_router._preview_ai_explanation",
             return_value={"status": "ok", "model_utilitzat": "fake-model"},
         ), patch(
@@ -666,6 +673,8 @@ class TestChecksAdminRouter(unittest.TestCase):
 
     def test_validate_preview_returns_error_without_ai_when_oracle_validation_fails(self):
         with patch("src.api.checks_admin_router._resolve_oracle_profile", return_value=("E13DB", {"USER": "u"})), patch(
+            "src.api.checks_admin_router.OracleDBManager",
+        ), patch(
             "src.api.checks_admin_router._run_single_post_crq_check",
             return_value={
                 "status": "error",
