@@ -1,0 +1,130 @@
+{
+  "ok": true,
+  "project_root": "C:\\Users\\GVLLFR0035\\OneDrive - Generalitat de Catalunya\\.....Antigravity\\Dashboard E13BD - còpia\\output\\devagent-controls\\failing-suite",
+  "manifest": ".devagent\\project.yaml",
+  "project_id": "control-failing-suite-4c5d162e",
+  "project_name": "Control failing-suite",
+  "required_devagent_version": ">=4.5",
+  "stack": {
+    "root": "C:\\Users\\GVLLFR0035\\OneDrive - Generalitat de Catalunya\\.....Antigravity\\Dashboard E13BD - còpia\\output\\devagent-controls\\failing-suite",
+    "technologies": [],
+    "build_systems": [],
+    "dependency_managers": [],
+    "test_frameworks": [],
+    "runtimes": [],
+    "services": [],
+    "details": {
+      "test_files": [
+        "test_fail.py"
+      ]
+    },
+    "workspaces": [],
+    "declaration_files": [],
+    "provenance": {},
+    "unknowns": [
+      "no project declaration was discovered inside the boundary — identity would rest on an empty declaration set"
+    ],
+    "boundary": {
+      "schema_version": "PROJECT_BOUNDARY_V1",
+      "root_name": "failing-suite",
+      "excluded_categories": [
+        "CACHE",
+        "DEPENDENCY",
+        "GENERATED",
+        "TOOL_STATE"
+      ],
+      "exclusions": []
+    },
+    "metrics": {
+      "files_seen": 1,
+      "files_in_scope": 1,
+      "files_excluded": 0,
+      "dirs_pruned": 0,
+      "bytes_considered": 437,
+      "duration_s": 0.001202,
+      "truncated": false,
+      "semantics": {
+        "files_seen": "filesystem entries examined by the bounded traversal",
+        "files_in_scope": "entries classified as project content",
+        "files_excluded": "entries classified outside the project (DEPENDENCY/GENERATED/CACHE/TOOL_STATE or an unfollowed symlink)",
+        "dirs_pruned": "dependency/generated roots whose contents are never enumerated",
+        "bytes_considered": "declaration bytes read (bounded per file)",
+        "truncated": "traversal hit its bound: the inventory is incomplete and said so"
+      }
+    },
+    "topology": "single-project",
+    "schema_version": "STACK_DISCOVERY_V2"
+  },
+  "gitignore_updated": true,
+  "framework_copied": false,
+  "audit": false,
+  "audit_mode": "NONE",
+  "audit_report": {
+    "mode": "NONE",
+    "performed": false
+  },
+  "run_id": "RUN-5C4327B7F03F47BB",
+  "terminal_state": "DISCOVERED",
+  "terminal_status": "SUCCESS",
+  "boundary": {
+    "excluded_categories": [
+      "CACHE",
+      "DEPENDENCY",
+      "GENERATED",
+      "TOOL_STATE"
+    ],
+    "exclusion_rules_applied": [],
+    "declaration_files": [],
+    "dependency_declaration_pollution": 0
+  },
+  "discovery": {
+    "root": "C:\\Users\\GVLLFR0035\\OneDrive - Generalitat de Catalunya\\.....Antigravity\\Dashboard E13BD - còpia\\output\\devagent-controls\\failing-suite",
+    "technologies": [],
+    "build_systems": [],
+    "dependency_managers": [],
+    "test_frameworks": [],
+    "runtimes": [],
+    "services": [],
+    "details": {
+      "test_files": [
+        "test_fail.py"
+      ]
+    },
+    "workspaces": [],
+    "declaration_files": [],
+    "provenance": {},
+    "unknowns": [
+      "no project declaration was discovered inside the boundary — identity would rest on an empty declaration set"
+    ],
+    "boundary": {
+      "schema_version": "PROJECT_BOUNDARY_V1",
+      "root_name": "failing-suite",
+      "excluded_categories": [
+        "CACHE",
+        "DEPENDENCY",
+        "GENERATED",
+        "TOOL_STATE"
+      ],
+      "exclusions": []
+    },
+    "metrics": {
+      "files_seen": 1,
+      "files_in_scope": 1,
+      "files_excluded": 0,
+      "dirs_pruned": 0,
+      "bytes_considered": 437,
+      "duration_s": 0.001202,
+      "truncated": false,
+      "semantics": {
+        "files_seen": "filesystem entries examined by the bounded traversal",
+        "files_in_scope": "entries classified as project content",
+        "files_excluded": "entries classified outside the project (DEPENDENCY/GENERATED/CACHE/TOOL_STATE or an unfollowed symlink)",
+        "dirs_pruned": "dependency/generated roots whose contents are never enumerated",
+        "bytes_considered": "declaration bytes read (bounded per file)",
+        "truncated": "traversal hit its bound: the inventory is incomplete and said so"
+      }
+    },
+    "topology": "single-project",
+    "schema_version": "STACK_DISCOVERY_V2"
+  }
+}

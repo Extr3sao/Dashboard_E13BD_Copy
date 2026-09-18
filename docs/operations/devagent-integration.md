@@ -226,3 +226,228 @@ declarar topologia de runtime/observabilitat; normalitzar el `last_audit` del ma
   `BUNDLE_SHA256 446d4002997804d3ff7417f7f92af95a8ce034e8eff3cbb60a7025a32438a405`, 40 fitxers)
   i `MANUAL_DEVAGENT_ARCHIVE.sha256` per a l'arxiu manual.
 - Arxiu del `.devagent` manual: `.devagent.pre-framework-audit/` (preservat).
+
+## 15. Tancament governat de verificació i certificació (2026-09-18, candidat v2)
+
+Aquesta secció substitueix la recomanació P1 de §13 ("run `VERIFY_ONLY` en un
+checkout local per obtenir `TESTED`/`E2E_VERIFIED`/`INDEPENDENTLY_VERIFIED`"):
+es va executar, i el resultat real és que **el framework 4.5.1 no pot arribar-hi**.
+
+### 15.1 Congelació de la font
+
+- `CERTIFICATION_SOURCE_COMMIT = b21f80d6443e663d95268d3f7f3b9b86d8f23db7`
+  (pare `4830b32490b687da541e8b7270ead252dd5428fe`), branca `main`.
+- Contracte de congelació: la font de producte i de proves queda congelada al
+  commit; els artefactes de verificació (`docs/operations/*`, `.certification/*`)
+  són additius i no modifiquen producte ni proves. `IMP` s'ancora explícitament
+  al commit congelat perquè el framework no ofereix cap camí `VERIFY_ONLY`
+  executat (vegeu 15.3).
+- Arbre brut resolt i classificat abans de congelar: PRODUCT (`src/api/post_crq_audit.py`,
+  `src/web-app/package.json`, `playwright-smoke.mjs`), TEST (7 fitxers pytest + 4 vitest),
+  DOC (`README.md`, runbook), DEVAGENT_STATE (`.gitignore`: `.devagent/`, `.da/`,
+  `.devagent.pre-framework-audit/`, `.freebuff/`, `*.db-journal|wal|shm`),
+  EVIDENCE (`docs/operations/devagent-evidence/*`), GENERATED (journal eliminat).
+  No s'ha committit cap caché, `node_modules`, venv, DB de test ni secret.
+
+### 15.2 Espai de treball local de certificació
+
+`C:\dev\dashboard-e13bd-cert` (NTFS local, fora d'OneDrive, Dropbox o xarxa):
+clon del commit congelat, `git status --porcelain` buit, 284 fitxers versionats,
+cap `dist/`, `node_modules/` ni `.devagent/` provinent de l'checkout original.
+
+- Python 3.14.3, `py -m venv .venv`, `pip install -r requirements.txt` → exit 0,
+  106 paquets en 368 s (únic drift respecte de l'entorn canònic: `pandas 3.0.6`
+  vs `3.0.5`; la resta de 105 paquets idèntics).
+- Node 24.16.0 / npm 11.13.0, `npm ci` → exit 0, 668 paquets en 104 s.
+- `devagent init . --name "Dashboard E13BD" --execution-mode GOVERNED_AUTONOMOUS`
+  → `ok=true`, `project_id=dashboard-e13bd-2695770f` (idèntic a l'checkout
+  original: la identitat és de nom+fingerprint, no de ruta), `required >=4.5`
+  → COMPATIBLE, `framework_copied=false`.
+- `devagent project-doctor .` → `all_ok=true`, `boundary_status=OK`,
+  `declaration_pollution=0`, `files_seen=284`, 10 exclusions
+  (CACHE/DEPENDENCY/TOOL_STATE/GENERATED: `__pycache__`, `.venv` via `pyvenv.cfg`,
+  `node_modules` via marker npm, `.git`, `.devagent`, `dist`),
+  `orphan_reservations.count=0`.
+- Únic efecte col·lateral del framework sobre la font: `devagent init` afegeix
+  el seu bloc d'ignorats de runtime a `.gitignore` (redundant amb la política
+  del repositori); es restaura perquè l'arbre quedi exactament al commit.
+
+### 15.3 Run governat `VERIFY_ONLY`: resultat real
+
+```
+devagent run "<goal de verificació>" . --intent VERIFY_ONLY --json
+```
+
+| run | v1 (commit 4830b32) | v2 (commit b21f80d) |
+|---|---|---|
+| run_id | `RUN-900A6F47276C4B45` | `RUN-A788645E738C4D46` |
+| intent classificat | `VERIFY_ONLY` (EXPLICIT) | `VERIFY_ONLY` (EXPLICIT) |
+| intent executat | `AUDIT_ONLY` | `AUDIT_ONLY` |
+| terminal_state | `AUDITED` (SUCCESS) | `AUDITED` (SUCCESS) |
+| claimed | `DISCOVERED, AUDITED` | `DISCOVERED, AUDITED` |
+| not_claimed | `IMPLEMENTING, IMPLEMENTED, TESTED, E2E_VERIFIED, INDEPENDENTLY_VERIFIED, CERTIFIED` | idem |
+| product_files_modified | 0 | 0 |
+| durada | 4 s | 4 s |
+
+**Defecte del framework (no del projecte)**: `IntentContract.VERIFY_ONLY`
+declara `terminal_state=INDEPENDENTLY_VERIFIED`, `required_states` fins a
+`INDEPENDENTLY_VERIFIED` i `a6_gate_required=True`, però `cmd_run`
+(`devagent.py:597-631`) envia **tota** intenció no mutadora a la branca de només
+lectura, i el darrer `else` d'aquesta branca (`else:  # AUDIT_ONLY`) executa
+l'auditoria brownfield i termina a `AUDITED`. La intenció demanada queda
+registrada al rebut de terminalització, però el cicle
+`TESTED → E2E_VERIFIED → INDEPENDENTLY_VERIFIED → CERTIFIED` no és assolible
+per cap via del CLI 4.5.1.
+
+Dos defectes addicionals, demostrats empíricament (vegeu 15.4):
+
+1. `core/phase4/test_orchestrator.py` només carrega mòduls `unittest` amb glob
+   de `test_*.py` **a l'arrel**; el contracte del projecte és pytest amb
+   `testpaths=tests` (`pytest.ini`). Un run governat veu 0 proves → A6 fa
+   fail-closed (correcte) i el run queda `BLOCKED`.
+2. `core/phase4/engineering_orchestrator.py` fa les transicions
+   `INDEPENDENTLY_VERIFIED` i `CERTIFIED` **incondicionalment**, sense invocar
+   cap verificador, i el CLI hi injecta un `e2e_check` stub
+   (`lambda: (0, "one-shot: no e2e fixture declared")`) que es tracta com a E2E
+   superat. El verificador independent real
+   (`core/autonomy/independent_verifier.py`, `evidence_authority.py`,
+   `traceability.py`, cablejats a `ValidationCoordinator`/`factory_runtime`) no
+   és abastable des del CLI.
+
+### 15.4 Controls negatius de fals èxit (A6)
+
+Projectes de control a `output/devagent-controls/` (fora del candidat):
+
+| control | run_id | exit | estat | motiu |
+|---|---|---|---|---|
+| 0 proves executables | `RUN-48605E66EADF49D1` | 1 | `BLOCKED` | `testing blocked: zero tests executed (A6 fake-PASS rejected)` |
+| suite executada que falla | `RUN-FD2CB5F6380C450E` | 1 | `BLOCKED` | `testing blocked: executed suite failed` |
+| 1 test trivial + `e2e_check` stub | `RUN-248573DB01424FE9` | 0 | `CERTIFIED` | `state=CERTIFIED`, `stages.e2e.observed="one-shot: no e2e fixture declared"`, cap verificador → **vector de fals èxit obert al framework** |
+
+A6 funciona (cap prova executada no pot ser `TESTED`), i alhora queda demostrat
+que un rebut `CERTIFIED` del framework no és per si mateix prova de res.
+
+### 15.5 Proves del candidat a l'espai net
+
+| porta | comanda canònica | exit | resultat | durada | log (sha256) |
+|---|---|---|---|---|---|
+| backend | `.venv/Scripts/python.exe -m pytest -q` (`testpaths=tests`) | 0 | **250 passed, 0 failed** | 401 s | `backend_pytest_v2.log` `831257fb…eb75` |
+| frontend | `npm test` (`vitest run`) | 0 | **26/26 fitxers, 79/79 tests** | 64 s | `fe_vitest_v2.log` `41593558…6b18` |
+| build | `npm run build` (`vite build`) | 0 | `dist/` generat | 44 s | `fe_build_v2.log` `3b930777…567a` |
+| E2E | `npm run smoke:ui` (Playwright, SPA construïda, API mockada) | 0 | `smoke success` | 40 s | `fe_smoke_v2.log` `211497c4…2dd5` |
+| residu SQLite | `src/db` abans/després | — | `*.db`, `-journal`, `-wal`, `-shm` = 0 | — | `backend_pytest_v2.log` |
+
+Nota d'hermeticitat: 4 proves de backend i 1 de frontend fallaven en un checkout
+pristí per dependre de l'entorn del desenvolupador (Oracle Instant Client
+obligatori via `ensure_oracle_thick_mode`, `config/Cadena_conexions.txt` local,
+i un `testTimeout` de 15 s superat quan tota la suite vitest corre en paral·lel).
+S'han reparat injectant dobles exactament com ja feien les proves germanes i
+declarant el pressupost de temps del test pesat; cap expectativa s'ha debilitat.
+Prova d'hermeticitat: les 20 proves afectades passen amb `instantclient/`
+**amagat** (17,7 s). El re-run complet posterior dona 250/250.
+
+### 15.6 Verificació independent
+
+`docs/operations/devagent-evidence/independent_verifier.py` és l'autoritat de
+verificació separada de l'executor (i separada del CLI, que no l'exposa):
+re-deriva la congelació, el boundary, els runs, els rebuts i el residu des de
+zero, i **re-executa** ella mateixa la suite de frontend i el smoke d'E2E.
+
+Resultat: **14/15 comprovacions PASS**, `informational_findings=[CHK-08B]`,
+`blockers=2` (els defectes del framework) → `CERTIFICATION_STATUS=NOT_CERTIFIED`,
+`report_sha256=e69f020346d164e66ffefb2b3c7b3196c426fff57ba9ca9974a2a82d807569ad`.
+
+Comprovat de manera independent: `git HEAD` = commit congelat amb arbre net;
+`all_ok=true` i `declaration_pollution=0` (project-doctor executat en viu pel
+verificador); 250/0 proves de backend; 26/79 de frontend reproduïdes pel
+verificador; `dist/index.html` `39fe5730…324d`; smoke reproduït; 0 residu SQLite;
+cap fitxer no declarat a l'espai; secrets ignorats i mai versionats; 3 runs amb
+**exactament una** terminalització cadascun i 0 orfes; rebuts d'auditoria
+**auto-validants** (`receipt_digest` recalculat = registrat) i amb
+`product_fingerprint_before == after`; rebuts de terminalització també
+auto-validants.
+
+### 15.7 Traçabilitat
+
+`docs/operations/devagent-evidence/traceability_v2.json`:
+
+- cadena de producte `REQ → ACC → ARCH → WP → IMP → TEST → EXEC → EVID → VERIFIER`:
+  **9/9 COMPLETE (100%)**, tots els artefactes referenciats existeixen.
+- cadena de certificació del framework `TESTED → E2E_VERIFIED →
+  INDEPENDENTLY_VERIFIED → CERTIFIED`: **0/5 COMPLETE**, cada enllaç marcat
+  `BLOCKED` amb `blocker_class=FRAMEWORK_DEFECT` i referència al codi font
+  (`devagent.py:597-631`, `test_orchestrator.py`, `engineering_orchestrator.py`
+  passos 10-11). Cap enllaç sintètic.
+
+### 15.8 Estat de certificació
+
+`CERTIFICATION_STATUS = NOT_CERTIFIED` — i és el resultat correcte, no una
+manca de feina:
+
+- totes les portes mesurables del producte passen (congelació, boundary,
+  250/250 backend, 79/79 frontend, build, E2E dins l'abast declarat, residu 0,
+  espai net, seguretat, terminalització, orfes 0, evidència, traçabilitat de
+  producte, verificador independent);
+- cap run del framework pot reclamar `TESTED`/`E2E_VERIFIED`/
+  `INDEPENDENTLY_VERIFIED`/`CERTIFIED` per a aquest projecte, i el framework
+  demostra que pot emetre un `CERTIFIED` sense E2E ni verificador. Certificar
+  aquí seria precisament el fals èxit que el propi framework prohibeix.
+
+Abast limitat explícitament: `smoke:ui:retal`/`smoke:ui:oracle` (validació
+Oracle real) **no** són una porta obligatòria d'aquesta certificació i no s'han
+executat: requereixen credencials i base de dades Oracle reals →
+`OPTIONAL_EXTERNAL_VALIDATION`, gate humà.
+
+### 15.9 Reproducció
+
+```powershell
+git clone "<checkout original>" C:\dev\dashboard-e13bd-cert
+py -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+cd src\web-app; npm ci; cd ..\..
+devagent init . --name "Dashboard E13BD" --execution-mode GOVERNED_AUTONOMOUS
+devagent project-doctor . --json
+devagent run "Verify the frozen release candidate end-to-end" . --intent VERIFY_ONLY --json
+.venv\Scripts\python.exe -m pytest -q
+cd src\web-app; npm test; npm run build; npm run smoke:ui
+```
+Per a la verificació independent, des de l'checkout original:
+
+```powershell
+py docs/operations/devagent-evidence/independent_verifier.py `
+  --workspace C:/dev/dashboard-e13bd-cert `
+  --logs <directori de logs> --controls <logs dels controls> `
+  --expected-commit b21f80d6443e663d95268d3f7f3b9b86d8f23db7 `
+  --ledger docs/operations/devagent-evidence/traceability_v2.json `
+  --out <directori de logs>/VERIFICATION_REPORT.json --rerun-fast
+```
+
+### 15.10 Portes P0/P1/P2 actualitzats
+
+- P0: cap. (`RISK-006` segueix requerint decisió humana de rotació, però no
+  bloqueja: mai versionat, ignorat per `*.bak`, i no és material duplicat
+  innecessari perquè pot ser l'única còpia local de les claus.)
+- P1: defectes del framework (enrutament `VERIFY_ONLY`, TEST només unittest a
+  l'arrel, transició `CERTIFIED` no guardada, `e2e_check` stub) — cal
+  corregir-los a DEV Agent, no al producte; `requirements.txt` sense pins;
+  CI absent (`GAP-002`).
+- P2: 3 fitxers llegats amb rutes absolutes de host (`src/api/fix_mojibake.py`,
+  `src/core/import_checks_from_md.py`, `tests/verify_pdf_refinement.py` i
+  germans a `archive/`/`scripts/`); `src/db/_probe.db` i
+  `src/db/internal_fallback.db` (0 bytes) fora de control de versions;
+  declarar entrypoint Python per tal que `ENTRYPOINTS` inclogui
+  `src/api/main.py` (`app=FastAPI(...)`, `run.ps1`
+  `uvicorn src.api.main:app --host 127.0.0.1 --port 8000`).
+
+### 15.11 Evidència del tancament
+
+- `docs/operations/devagent-evidence/traceability_v2.json` — cadena completa amb
+  estats i artefactes.
+- `docs/operations/devagent-evidence/independent_verifier.py` — autoritat de
+  verificació (reproduïble).
+- `docs/operations/devagent-evidence/VERIFICATION_REPORT.json` — informe del
+  verificador (`report_sha256=e69f0203…69ad`).
+- `docs/operations/devagent-evidence/CERTIFICATION_EVIDENCE.sha256` — inventari
+  SHA-256 dels logs d'execució, dels controls i dels JSON de l'checkout net.
+- Espai net: `.certification/` (informe + ledger) i `.devagent/evidence/RUN-A788645E738C4D46/`
+  (12 artefactes + rebut auto-validant).

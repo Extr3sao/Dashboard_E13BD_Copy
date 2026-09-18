@@ -1,0 +1,15 @@
+======================================================================
+FAIL: test_deliberate_failure (test_fail.ControlFailure.test_deliberate_failure)
+deliberately false assertion — this suite must never reach TESTED
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\GVLLFR0035\OneDrive - Generalitat de Catalunya\.....Antigravity\Dashboard E13BD - còpia\output\devagent-controls\failing-suite\test_fail.py", line 12, in test_deliberate_failure
+    self.assertEqual(1, 2)
+    ~~~~~~~~~~~~~~~~^^^^^^
+AssertionError: 1 != 2
+
+----------------------------------------------------------------------
+Ran 1 test in 0.006s
+
+FAILED (failures=1)
+error: RUN_BLOCKED [RUN-FD2CB5F6380C450E] testing blocked: executed suite failed (terminal receipt 77a9b20914f67f32)

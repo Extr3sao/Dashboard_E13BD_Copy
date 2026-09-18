@@ -1,0 +1,186 @@
+{
+  "schema_version": "TRACEABILITY_V1",
+  "recorded_at": "2026-09-18",
+  "project": "Dashboard E13BD",
+  "project_id": "dashboard-e13bd-2695770f",
+  "source_commit": "b21f80d6443e663d95268d3f7f3b9b86d8f23db7",
+  "source_commit_parent": "4830b32490b687da541e8b7270ead252dd5428fe",
+  "freeze_contract": "Product and test source are frozen at source_commit; the certification workspace is a pristine clone of it (git status clean). Verification artifacts under docs/operations/ and .certification/ are additive documentation/evidence and do not alter product or test source. IMP links to the frozen implementation commit because the framework provides no routed VERIFY_ONLY execution path (see FRAMEWORK_CERTIFICATION chain).",
+  "devagent": {
+    "version": "4.5.1",
+    "release_id": "REL-4.5.1-E6116BDBD69B",
+    "install": "pipx (local authorized source, not PyPI devagent 1.1.0)"
+  },
+  "chains": {
+    "PRODUCT_VERIFICATION": "REQ -> ACC -> ARCH -> WP -> IMP -> TEST -> EXEC -> EVID -> VERIFIER for the frozen release candidate",
+    "FRAMEWORK_CERTIFICATION": "the framework-executed TESTED -> E2E_VERIFIED -> INDEPENDENTLY_VERIFIED -> CERTIFIED chain required for a DEV Agent certification receipt"
+  },
+  "links": [
+    {
+      "link": "REQ",
+      "chain": "PRODUCT_VERIFICATION",
+      "status": "COMPLETE",
+      "statement": "The candidate must satisfy the project's declared, executable quality contract: pytest suite (tests/, pytest.ini), vitest suite (src/web-app), vite build, Playwright preview smoke, clean workspace, no secret leakage.",
+      "artifacts": [
+        {"path": "pytest.ini", "sha256": "cedefd0f22b8c6c1d260a6b67be89b8befd43c60ea035a155d58c8ef8cd3fce2"},
+        {"path": "requirements.txt", "sha256": "a1517eebc7ab1f79fce702a29e917b91880b1d6f0e21f43d9af64bee65a1929e"},
+        {"path": "src/web-app/package.json", "sha256": "311ec0d4272843f60f8d26a75d4fa9fe359d33c1c5e8b5a7ac8c293edf9fb76e"}
+      ],
+      "cross_ref": "FRAMEWORK_CERTIFICATION/FW-VERIFY-ROUTING (the framework cannot turn this REQ into a governed test claim)"
+    },
+    {
+      "link": "ACC",
+      "chain": "PRODUCT_VERIFICATION",
+      "status": "COMPLETE",
+      "statement": "Acceptance criteria = the nine mandatory certification gates measured in this run (source freeze, boundary, backend, frontend, build, E2E, residue, workspace, security) plus evidence/terminalization/traceability/false-success checks CHK-01..CHK-15 of the independent verifier.",
+      "artifacts": [
+        {"path": "C:/Users/GVLLFR0035/OneDrive - Generalitat de Catalunya/.....Antigravity/Dashboard E13BD - còpia/docs/operations/devagent-evidence/independent_verifier.py", "note": "acceptance checks are executable, not prose"}
+      ]
+    },
+    {
+      "link": "ARCH",
+      "chain": "PRODUCT_VERIFICATION",
+      "status": "COMPLETE",
+      "statement": "AS-IS architecture, technical inventory and entrypoints are the framework's own brownfield audit output for this project (run RUN-A788645E738C4D46).",
+      "artifacts": [
+        {"path": ".devagent/evidence/RUN-A788645E738C4D46/ARCHITECTURE_AS_IS.json", "sha256": "2155eda10716fd22b920af3b16484079c3b6d3a63149eff4b08a1df58e689431"},
+        {"path": ".devagent/evidence/RUN-A788645E738C4D46/FOUNDATIONAL_CONTEXT.json", "sha256": "a4474ec4748ff0ff538794ad0a16d6a410938cd2ddf659c5a2a6736a8a437494"},
+        {"path": ".devagent/evidence/RUN-A788645E738C4D46/ENTRYPOINTS.json", "sha256": "ee9aa5a1504aa47b30fcac37dd346723ba528e78ef854ebfe66566d7a0fed32d"}
+      ]
+    },
+    {
+      "link": "WP",
+      "chain": "PRODUCT_VERIFICATION",
+      "status": "COMPLETE",
+      "statement": "Work packages realised by the candidate: (WP-1) repair the pre-existing backend/frontend failures without weakening expectations, (WP-2) remove host coupling from the certification suite, (WP-3) restore warning-level observability in post_crq_audit, (WP-4) declare the SPA entrypoint and repoint the runbook link, (WP-5) isolate DEV Agent runtime state from the product tree.",
+      "artifacts": [
+        {"path": "src/api/post_crq_audit.py", "sha256": "8497cafb29e73b9dd59ac9b09d1e66587201b5b9356ce5fe4b529a86604e82f8"},
+        {"path": "src/api/main.py", "sha256": "79a6f765f8d5a5faf7b14a5a1aaf9e08192c40dcda3b94b042b288947396a491"}
+      ]
+    },
+    {
+      "link": "IMP",
+      "chain": "PRODUCT_VERIFICATION",
+      "status": "COMPLETE",
+      "statement": "Frozen implementation = git commit b21f80d6443e663d95268d3f7f3b9b86d8f23db7 (parent 4830b32). Explicitly referenced as an existing frozen implementation, not as a new implementation run: the framework's VERIFY_ONLY intent is not routed (see FW-VERIFY-ROUTING).",
+      "artifacts": [
+        {"path": "C:/dev/dashboard-e13bd-cert/.git", "note": "git rev-parse HEAD == b21f80d6443e663d95268d3f7f3b9b86d8f23db7, working tree clean"}
+      ]
+    },
+    {
+      "link": "TEST",
+      "chain": "PRODUCT_VERIFICATION",
+      "status": "COMPLETE",
+      "statement": "Declared suites: 250 pytest tests in tests/ (pytest.ini testpaths=tests) and 79 vitest tests across 26 files in src/web-app (26 passed / 79 passed in the frozen workspace).",
+      "artifacts": [
+        {"path": "C:/dev/e13bd-cert-logs/backend_pytest_v2.log", "sha256": "831257fb132925ac1acc169195e8c7b4f00aa34af555192011829448ca02eb75"},
+        {"path": "C:/dev/e13bd-cert-logs/fe_vitest_v2.log", "sha256": "415935589977dfb50d93a2be9bb1e462fcdcf719f911ee8f641c7056639b6b18"}
+      ]
+    },
+    {
+      "link": "EXEC",
+      "chain": "PRODUCT_VERIFICATION",
+      "status": "COMPLETE",
+      "statement": "Executions on the pristine local (NTFS, non-cloud) checkout: backend pytest exit 0 (250 passed, 401s), vitest exit 0 (26 files/79 tests, 64s), vite build exit 0 (44s), Playwright preview smoke exit 0 (40s, 'smoke success').",
+      "artifacts": [
+        {"path": "C:/dev/e13bd-cert-logs/backend_pytest_v2.log", "sha256": "831257fb132925ac1acc169195e8c7b4f00aa34af555192011829448ca02eb75"},
+        {"path": "C:/dev/e13bd-cert-logs/fe_build_v2.log", "sha256": "3b9307773c549543a9cebefa12db485c04f4e7ab9bf7e52f09bd649ccf30567a"},
+        {"path": "C:/dev/e13bd-cert-logs/fe_smoke_v2.log", "sha256": "211497c4593d2d99d2f0c40b4c475f89dce7be0c0dc73a4fe270b8bee1e92dd5"},
+        {"path": "src/web-app/dist/index.html", "sha256": "39fe57305bfe1f9a203d8fa8fa833699fd53b8564624d7538bf27c92bf3a324d"}
+      ]
+    },
+    {
+      "link": "EVID",
+      "chain": "PRODUCT_VERIFICATION",
+      "status": "COMPLETE",
+      "statement": "Framework evidence: governed run RUN-A788645E738C4D46 (intent VERIFY_ONLY requested, executed as AUDIT_ONLY), terminal state AUDITED, product_files_modified 0, self-validating receipt (receipt_digest recomputed by the verifier), 29 findings / 6 risks / 3 gaps at 100% category coverage.",
+      "artifacts": [
+        {"path": ".devagent/evidence/RUN-A788645E738C4D46/AUDIT_RECEIPT.json", "sha256": "93364b4092a34204f0bade4c45c04bd7bbf33079f50383e948aa789ece1b6fe0", "self_binding": "receipt_digest = sha256(canonical json without receipt_digest)"},
+        {"path": ".devagent/evidence/RUN-A788645E738C4D46/RISK_REGISTER.json", "sha256": "90cb0d95ac449702999f7408e1ffb784efe330467276b1186a6b8d046a77b07d"},
+        {"path": ".devagent/evidence/RUN-A788645E738C4D46/GAP_ANALYSIS.json", "sha256": "2e550234f074f68335627de10b79d492715c088cc02d8e33e8fe232996681bcf"},
+        {"path": "C:/dev/e13bd-cert-logs/run_verify_only_v2.json", "sha256": "431d3ff95d053641183e30da4aacf8b4b93f00359acc2c5f68ebbb7382ef6eb2"}
+      ]
+    },
+    {
+      "link": "VERIFIER",
+      "chain": "PRODUCT_VERIFICATION",
+      "status": "COMPLETE",
+      "statement": "Independent verifier process (separate from the executor, and separate from the framework CLI): re-derives the freeze, boundary, runs, receipts and residue from first principles, re-executes the frontend suite and the E2E smoke, and re-checks every gate; it writes VERIFICATION_REPORT.json with a sha256 self-binding.",
+      "artifacts": [
+        {"path": "C:/Users/GVLLFR0035/OneDrive - Generalitat de Catalunya/.....Antigravity/Dashboard E13BD - còpia/docs/operations/devagent-evidence/independent_verifier.py"}
+      ]
+    },
+    {
+      "link": "FW-VERIFY-ROUTING",
+      "chain": "FRAMEWORK_CERTIFICATION",
+      "status": "BLOCKED",
+      "statement": "devagent run --intent VERIFY_ONLY is accepted by the CLI (IntentContract VERIFY_ONLY: terminal_state=INDEPENDENTLY_VERIFIED, product_mutation_allowed=false, a6_gate_required=true) but cmd_run dispatches every non-mutating intent into the read-only branch whose final else arm hardcodes the AUDIT_ONLY path; the run terminalizes at AUDITED and reports intent=AUDIT_ONLY. Observed identically on candidate v1 (RUN-900A6F47276C4B45) and v2 (RUN-A788645E738C4D46).",
+      "blocker_class": "FRAMEWORK_DEFECT",
+      "artifacts": [
+        {"path": "C:/dev/e13bd-cert-logs/run_verify_only_v2.json", "sha256": "431d3ff95d053641183e30da4aacf8b4b93f00359acc2c5f68ebbb7382ef6eb2"}
+      ],
+      "source_reference": "devagent.py:597-631 (if not contract.product_mutation_allowed: ... else:  # AUDIT_ONLY)"
+    },
+    {
+      "link": "FW-TEST-DISCOVERY",
+      "chain": "FRAMEWORK_CERTIFICATION",
+      "status": "BLOCKED",
+      "statement": "The framework's TEST gate cannot execute this project's suites: core/phase4/test_orchestrator.py loads unittest modules matched by a root-level 'test_*.py' glob, while the project contract is pytest with testpaths=tests. A governed mutating run therefore sees zero tests and must fail closed (A6), which the control run confirms.",
+      "blocker_class": "FRAMEWORK_DEFECT",
+      "artifacts": [
+        {"path": "pytest.ini", "sha256": "cedefd0f22b8c6c1d260a6b67be89b8befd43c60ea035a155d58c8ef8cd3fce2"},
+        {"path": "C:/Users/GVLLFR0035/OneDrive - Generalitat de Catalunya/.....Antigravity/Dashboard E13BD - còpia/output/devagent-controls/logs/a6-zero-tests_run.json"}
+      ],
+      "source_reference": "core/phase4/test_orchestrator.py::TestOrchestrator.run (root.glob(pattern), unittest loader)"
+    },
+    {
+      "link": "FW-E2E",
+      "chain": "FRAMEWORK_CERTIFICATION",
+      "status": "BLOCKED",
+      "statement": "The CLI supplies a hardcoded e2e_check stub (lambda: (0, 'one-shot: no e2e fixture declared')) which the orchestrator treats as a passing E2E, so no framework E2E_VERIFIED claim can be trusted for this project.",
+      "blocker_class": "FRAMEWORK_DEFECT",
+      "artifacts": [
+        {"path": "C:/Users/GVLLFR0035/OneDrive - Generalitat de Catalunya/.....Antigravity/Dashboard E13BD - còpia/output/devagent-controls/logs/false-success_run.json"}
+      ],
+      "source_reference": "devagent.py::_orchestrate (e2e_check=lambda: (0, 'one-shot: no e2e fixture declared'))"
+    },
+    {
+      "link": "FW-INDEPENDENT-VERIFIER",
+      "chain": "FRAMEWORK_CERTIFICATION",
+      "status": "BLOCKED",
+      "statement": "core/phase4/engineering_orchestrator.py performs the INDEPENDENTLY_VERIFIED and CERTIFIED transitions unconditionally (no verifier invocation, no acceptance check); the real authority (core/autonomy/independent_verifier.py + evidence_authority.py + traceability.py, wired in ValidationCoordinator/factory_runtime) is never reached from devagent run. The framework therefore cannot issue an independent verification receipt for this project.",
+      "blocker_class": "FRAMEWORK_DEFECT",
+      "artifacts": [
+        {"path": "C:/Users/GVLLFR0035/OneDrive - Generalitat de Catalunya/.....Antigravity/Dashboard E13BD - còpia/output/devagent-controls/logs/false-success_run.json"}
+      ],
+      "source_reference": "core/phase4/engineering_orchestrator.py steps 10-11 (controller.transition('INDEPENDENTLY_VERIFIED'), controller.transition('CERTIFIED'))"
+    },
+    {
+      "link": "FW-CERTIFICATION",
+      "chain": "FRAMEWORK_CERTIFICATION",
+      "status": "BLOCKED",
+      "statement": "No framework certification artifact exists for this project: no certificate id, no verifier binding, no source-commit binding. The control run proves a CERTIFIED receipt can be produced without E2E evidence and without any verifier, so a framework CERTIFIED receipt for this project would not be trustworthy.",
+      "blocker_class": "FRAMEWORK_DEFECT",
+      "artifacts": [
+        {"path": ".devagent/state/registry.json"}
+      ]
+    }
+  ],
+  "coverage": {
+    "PRODUCT_VERIFICATION": "9/9 links COMPLETE (100%)",
+    "FRAMEWORK_CERTIFICATION": "0/5 links COMPLETE (0%) - blocked by the four framework defects above",
+    "mandatory_certification_coverage": "0% for the framework-certified chain; 100% for the product-verification chain"
+  },
+  "false_success_controls": [
+    {"control": "zero executable tests -> IMPLEMENTATION run", "run_id": "RUN-48605E66EADF49D1", "exit": 1, "terminal": "BLOCKED", "reason": "testing blocked: zero tests executed (A6 fake-PASS rejected)"},
+    {"control": "executed suite fails -> IMPLEMENTATION run", "run_id": "RUN-FD2CB5F6380C450E", "exit": 1, "terminal": "BLOCKED", "reason": "testing blocked: executed suite failed"},
+    {"control": "one trivial test + stub e2e_check -> IMPLEMENTATION run", "run_id": "RUN-248573DB01424FE9", "exit": 0, "terminal": "CERTIFIED", "reason": "state=CERTIFIED with e2e observed='one-shot: no e2e fixture declared' and no verifier: OPEN false-success vector (framework defect, not a project claim)"}
+  ],
+  "unresolved_findings": [
+    "RISK-002 (framework audit): dependencies declared without a pinned/locked Python manifest - requirements.txt is unpinned; the clean reconstruction resolved pandas 3.0.6 vs the developer environment's 3.0.5.",
+    "GAP-002 (framework audit): no CI configuration; the suite is executed manually.",
+    "Legacy maintenance scripts still hardcode c:\\Users\\45485456N\\... paths (archive/, scripts/create_backup.py, src/api/fix_mojibake.py, src/core/import_checks_from_md.py, tests/verify_pdf_refinement.py) - host-coupled, not part of the runtime path.",
+    "config/.env.bak holds real OPENROUTER/GOOGLE API keys (never tracked, ignored via *.bak); it is duplicate secret material and may be the operator's only local copy - left untouched, rotation is a human decision.",
+    "src/db/_probe.db and src/db/internal_fallback.db (0-byte local artifacts) exist in the original OneDrive checkout outside version control."
+  ]
+}

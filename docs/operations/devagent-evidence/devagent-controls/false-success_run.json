@@ -1,0 +1,347 @@
+----------------------------------------------------------------------
+Ran 1 test in 0.000s
+
+OK
+{
+  "run_id": "RUN-248573DB01424FE9",
+  "objective": "implement the verification of the release candidate",
+  "state": "CERTIFIED",
+  "certified": true,
+  "human_interventions": 0,
+  "stages": {
+    "discovery": {
+      "run_id": "RUN-248573DB01424FE9",
+      "root": "C:\\Users\\GVLLFR0035\\OneDrive - Generalitat de Catalunya\\.....Antigravity\\Dashboard E13BD - còpia\\output\\devagent-controls\\false-success",
+      "files": [
+        ".gitignore",
+        "test_smoke.py",
+        ".da/runtime/registry.json",
+        ".da/runtime/broker_runtime/run_state.json",
+        ".devagent/project.yaml",
+        ".devagent/state/registry.json",
+        ".devagent/state/reservations/RUN-16209E7637DF4960.json",
+        ".devagent/state/reservations/RUN-248573DB01424FE9.json",
+        ".devagent/state/terminal/RUN-16209E7637DF4960.json"
+      ],
+      "test_files": [
+        "test_smoke.py"
+      ],
+      "config_files": [],
+      "declared_dependencies": [],
+      "unknown_entries": [],
+      "observed_at": "2026-09-18T12:22:17.285790+00:00"
+    },
+    "intent": {
+      "intent": "IMPLEMENTATION",
+      "terminal_state": "CERTIFIED",
+      "required_states": [
+        "DISCOVERED",
+        "AUDITED",
+        "ARCHITECTED",
+        "PLANNED",
+        "IMPLEMENTING",
+        "IMPLEMENTED",
+        "TESTED",
+        "E2E_VERIFIED",
+        "INDEPENDENTLY_VERIFIED",
+        "CERTIFIED"
+      ],
+      "product_mutation_allowed": true,
+      "a6_gate_required": true,
+      "claims": [
+        "DISCOVERED",
+        "AUDITED",
+        "ARCHITECTED",
+        "PLANNED",
+        "IMPLEMENTING",
+        "IMPLEMENTED",
+        "TESTED",
+        "E2E_VERIFIED",
+        "INDEPENDENTLY_VERIFIED",
+        "CERTIFIED"
+      ],
+      "description": "Full certified lifecycle; A6 mandatory."
+    },
+    "audit": {
+      "run_id": "RUN-248573DB01424FE9",
+      "root": "C:\\Users\\GVLLFR0035\\OneDrive - Generalitat de Catalunya\\.....Antigravity\\Dashboard E13BD - còpia\\output\\devagent-controls\\false-success",
+      "findings": [
+        {
+          "finding_id": "FIND-01",
+          "evidence_type": "test",
+          "artifact": "tests/",
+          "description": "1 test files declared",
+          "severity": "info"
+        },
+        {
+          "finding_id": "FIND-02",
+          "evidence_type": "config",
+          "artifact": "MANIFEST.yaml",
+          "description": "no declared configuration manifest — dependency policy at risk",
+          "severity": "warning"
+        },
+        {
+          "finding_id": "FIND-03",
+          "evidence_type": "config",
+          "artifact": "requirements.txt",
+          "description": "no declared dependencies — undeclared-dependency risk",
+          "severity": "warning"
+        },
+        {
+          "finding_id": "FIND-04",
+          "evidence_type": "code",
+          "artifact": "test_smoke.py",
+          "description": "1 python modules observed",
+          "severity": "info"
+        },
+        {
+          "finding_id": "FIND-05",
+          "evidence_type": "command",
+          "artifact": "git status --porcelain",
+          "description": "no git metadata (GIT_UNAVAILABLE)",
+          "severity": "info"
+        }
+      ],
+      "audited_at": "2026-09-18T12:22:17.309211+00:00"
+    },
+    "architecture": {
+      "plan_id": "ARCH-4-01",
+      "current": {
+        "stack": {
+          "root": "C:\\Users\\GVLLFR0035\\OneDrive - Generalitat de Catalunya\\.....Antigravity\\Dashboard E13BD - còpia\\output\\devagent-controls\\false-success",
+          "technologies": [],
+          "build_systems": [],
+          "dependency_managers": [],
+          "test_frameworks": [],
+          "runtimes": [],
+          "services": [],
+          "details": {
+            "test_files": [
+              "test_smoke.py"
+            ]
+          },
+          "workspaces": [],
+          "declaration_files": [],
+          "provenance": {},
+          "unknowns": [
+            "no project declaration was discovered inside the boundary — identity would rest on an empty declaration set"
+          ],
+          "boundary": {
+            "schema_version": "PROJECT_BOUNDARY_V1",
+            "root_name": "false-success",
+            "excluded_categories": [
+              "CACHE",
+              "DEPENDENCY",
+              "GENERATED",
+              "TOOL_STATE"
+            ],
+            "exclusions": []
+          },
+          "metrics": {
+            "files_seen": 1,
+            "files_in_scope": 1,
+            "files_excluded": 0,
+            "dirs_pruned": 0,
+            "bytes_considered": 543,
+            "duration_s": 0.001309,
+            "truncated": false,
+            "semantics": {
+              "files_seen": "filesystem entries examined by the bounded traversal",
+              "files_in_scope": "entries classified as project content",
+              "files_excluded": "entries classified outside the project (DEPENDENCY/GENERATED/CACHE/TOOL_STATE or an unfollowed symlink)",
+              "dirs_pruned": "dependency/generated roots whose contents are never enumerated",
+              "bytes_considered": "declaration bytes read (bounded per file)",
+              "truncated": "traversal hit its bound: the inventory is incomplete and said so"
+            }
+          },
+          "topology": "single-project",
+          "schema_version": "STACK_DISCOVERY_V2"
+        }
+      },
+      "target": {
+        "goal": "implement the verification of the release candidate"
+      },
+      "delta": [
+        {
+          "component": "goal",
+          "from": "<absent>",
+          "to": "implement the verification of the release candidate"
+        },
+        {
+          "component": "stack",
+          "from": {
+            "root": "C:\\Users\\GVLLFR0035\\OneDrive - Generalitat de Catalunya\\.....Antigravity\\Dashboard E13BD - còpia\\output\\devagent-controls\\false-success",
+            "technologies": [],
+            "build_systems": [],
+            "dependency_managers": [],
+            "test_frameworks": [],
+            "runtimes": [],
+            "services": [],
+            "details": {
+              "test_files": [
+                "test_smoke.py"
+              ]
+            },
+            "workspaces": [],
+            "declaration_files": [],
+            "provenance": {},
+            "unknowns": [
+              "no project declaration was discovered inside the boundary — identity would rest on an empty declaration set"
+            ],
+            "boundary": {
+              "schema_version": "PROJECT_BOUNDARY_V1",
+              "root_name": "false-success",
+              "excluded_categories": [
+                "CACHE",
+                "DEPENDENCY",
+                "GENERATED",
+                "TOOL_STATE"
+              ],
+              "exclusions": []
+            },
+            "metrics": {
+              "files_seen": 1,
+              "files_in_scope": 1,
+              "files_excluded": 0,
+              "dirs_pruned": 0,
+              "bytes_considered": 543,
+              "duration_s": 0.001309,
+              "truncated": false,
+              "semantics": {
+                "files_seen": "filesystem entries examined by the bounded traversal",
+                "files_in_scope": "entries classified as project content",
+                "files_excluded": "entries classified outside the project (DEPENDENCY/GENERATED/CACHE/TOOL_STATE or an unfollowed symlink)",
+                "dirs_pruned": "dependency/generated roots whose contents are never enumerated",
+                "bytes_considered": "declaration bytes read (bounded per file)",
+                "truncated": "traversal hit its bound: the inventory is incomplete and said so"
+              }
+            },
+            "topology": "single-project",
+            "schema_version": "STACK_DISCOVERY_V2"
+          },
+          "to": "<absent>"
+        }
+      ],
+      "backwards_compatible": true,
+      "created_at": "2026-09-18T12:22:17.315243+00:00"
+    },
+    "rfc": {
+      "required": false,
+      "impacts": []
+    },
+    "requirements": {
+      "objective": "implement the verification of the release candidate",
+      "run_id": "RUN-248573DB01424FE9",
+      "criteria": [
+        "ACC-4-01",
+        "ACC-4-02",
+        "ACC-4-03",
+        "ACC-4-04",
+        "ACC-4-05",
+        "ACC-4-06",
+        "ACC-4-07",
+        "ACC-4-08",
+        "ACC-4-09",
+        "ACC-4-10",
+        "ACC-4-11",
+        "ACC-4-12",
+        "ACC-4-13",
+        "ACC-4-14",
+        "ACC-4-15",
+        "ACC-4-16"
+      ],
+      "mandatory": 16
+    },
+    "planning": {
+      "plan_id": "PLAN-4-01",
+      "objective": "implement the verification of the release candidate",
+      "scope": [
+        "goal"
+      ],
+      "dependencies": {
+        "rfc": null
+      },
+      "order": [],
+      "affected_files": [],
+      "tests": [
+        "test_*.py"
+      ],
+      "rollback": "revert affected files",
+      "risks": [
+        "3A/3B regression risk mitigated by PHASE4_ONLY_FILES"
+      ],
+      "accepted": true,
+      "accepted_at": "2026-09-18T12:22:17.323361+00:00",
+      "created_at": "2026-09-18T12:22:17.323296+00:00"
+    },
+    "implementation": {},
+    "testing": {
+      "tests_run": 1,
+      "failures": 0,
+      "errors": 0,
+      "passed": true
+    },
+    "e2e": {
+      "exit_code": 0,
+      "observed": "one-shot: no e2e fixture declared",
+      "passed": true
+    }
+  },
+  "ended_at": "2026-09-18T12:22:17.366281+00:00",
+  "intent": "IMPLEMENTATION",
+  "terminal_state": "CERTIFIED",
+  "read_only": false,
+  "claims": [
+    "DISCOVERED",
+    "AUDITED",
+    "ARCHITECTED",
+    "PLANNED",
+    "IMPLEMENTING",
+    "IMPLEMENTED",
+    "TESTED",
+    "E2E_VERIFIED",
+    "INDEPENDENTLY_VERIFIED",
+    "CERTIFIED"
+  ],
+  "not_claimed": [],
+  "terminal_status": "SUCCESS",
+  "intent_classification": {
+    "schema_version": "LIFECYCLE_INTENT_V1",
+    "intent": "IMPLEMENTATION",
+    "confidence": "HIGH",
+    "authority": "EXPLICIT",
+    "rationale": "intent supplied explicitly by the caller (CLI authority)",
+    "signals": {},
+    "contract": {
+      "intent": "IMPLEMENTATION",
+      "terminal_state": "CERTIFIED",
+      "required_states": [
+        "DISCOVERED",
+        "AUDITED",
+        "ARCHITECTED",
+        "PLANNED",
+        "IMPLEMENTING",
+        "IMPLEMENTED",
+        "TESTED",
+        "E2E_VERIFIED",
+        "INDEPENDENTLY_VERIFIED",
+        "CERTIFIED"
+      ],
+      "product_mutation_allowed": true,
+      "a6_gate_required": true,
+      "claims": [
+        "DISCOVERED",
+        "AUDITED",
+        "ARCHITECTED",
+        "PLANNED",
+        "IMPLEMENTING",
+        "IMPLEMENTED",
+        "TESTED",
+        "E2E_VERIFIED",
+        "INDEPENDENTLY_VERIFIED",
+        "CERTIFIED"
+      ],
+      "description": "Full certified lifecycle; A6 mandatory."
+    }
+  }
+}

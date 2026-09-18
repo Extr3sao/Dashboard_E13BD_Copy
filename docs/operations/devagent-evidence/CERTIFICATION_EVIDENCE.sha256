@@ -1,0 +1,34 @@
+36fd54f0eccc18c1921a0f8c1dc33334540c43d0b4e391a5f90bdc87b34f1126  C:\dev\e13bd-cert-logs\backend_hermetic_proof.log
+cb04567643815ede70c56af48803fb5ec542f25f04c5b54267a44b5ff782bf66  C:\dev\e13bd-cert-logs\backend_pytest.log
+831257fb132925ac1acc169195e8c7b4f00aa34af555192011829448ca02eb75  C:\dev\e13bd-cert-logs\backend_pytest_v2.log
+08560954e3ea7a3b1137a920b49f323afe65a7c6046c8d967f35d12121b3d7ef  C:\dev\e13bd-cert-logs\backend_targeted_fix.log
+3b9307773c549543a9cebefa12db485c04f4e7ab9bf7e52f09bd649ccf30567a  C:\dev\e13bd-cert-logs\fe_build_v2.log
+949bb630e8ea50d73617f6a7739e0b68fbc497744d7da71895967900ecc97709  C:\dev\e13bd-cert-logs\fe_help_debug.log
+84f3e228509c160fee89eee005e2a6c8172a015b6b29884d449c33d1a8419ad8  C:\dev\e13bd-cert-logs\fe_help_isolated.log
+211497c4593d2d99d2f0c40b4c475f89dce7be0c0dc73a4fe270b8bee1e92dd5  C:\dev\e13bd-cert-logs\fe_smoke_v2.log
+415935589977dfb50d93a2be9bb1e462fcdcf719f911ee8f641c7056639b6b18  C:\dev\e13bd-cert-logs\fe_vitest_v2.log
+edb159bcdc49085f5c9c15cc8db05a2ff4927e1d73fdcaeada188833b3897dbf  C:\dev\e13bd-cert-logs\frontend_vitest.log
+7bfa4fd0c0cb4a328f3cde54f78fcbc15d6263fa42b449787fe2de4d9d49c644  C:\dev\e13bd-cert-logs\frontend_vitest_run2.log
+bb1f295c879dcc6c05381db3bd5f0580341cc7ccf03c689d397030049fb1e781  C:\dev\e13bd-cert-logs\npm_ci.log
+3c56aecba9dcaed05bdcd1fd09ee03937822836e4ddaa095a95017f1e8b1973b  C:\dev\e13bd-cert-logs\pip_install.log
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  C:\dev\e13bd-cert-logs\venv_create.log
+0fb9a846093ee2ff5c6a9b58844e34b555a9d1ca0ac0f3914347faf16915e322  C:\dev\e13bd-cert-logs\init.json
+d9c7c240eb71eb1bcdc1d1a45a61a49ef39cb915ecf81539c0ed02f73439c8d5  C:\dev\e13bd-cert-logs\project_doctor_after.json
+88e5baef2e15ee22a32b3f70ab11838cc9d6f840dedad9982d1f94937056af2d  C:\dev\e13bd-cert-logs\project_doctor_final.json
+ddeedf126c0246288c9c22a6bb549d8a7abbd5bc4cf166c97a4fc327f5f6fe39  C:\dev\e13bd-cert-logs\project_doctor_initial.json
+96b72cf0ac6280a7e3232821dae8021bdecbe0f9b1420c164f8151e654505358  C:\dev\e13bd-cert-logs\run_verify_only.json
+431d3ff95d053641183e30da4aacf8b4b93f00359acc2c5f68ebbb7382ef6eb2  C:\dev\e13bd-cert-logs\run_verify_only_v2.json
+aded0302a6228b6a72e89e2a5ceeaccafd28419a80adc54f5f0a1f01ca43cb17  C:\dev\e13bd-cert-logs\VERIFICATION_REPORT.json
+b88ca8795cc561e206b91d0f6a9791a29327f4ca5b2ffbd919ee71be0a894891  C:\dev\e13bd-cert-logs\pip_freeze_canonical.txt
+b74da91f390ed0c464d488aae2d4a02ea90031adfa438aa4d607cd600fcd23a8  C:\dev\e13bd-cert-logs\pip_freeze_clean.txt
+b45a884a5829e4482e34fee95552ab3aeb371dbe586783d68724c235d9f7cacc  C:\Users\GVLLFR0035\OneDrive - Generalitat de Catalunya\.....Antigravity\Dashboard E13BD - còpia\docs\operations\devagent-evidence\devagent-controls\a6-zero-tests_init.json
+bb85b6eee4e23f35ab7126e2255cf457ef2e98c824984a9be9d827ff082e1460  C:\Users\GVLLFR0035\OneDrive - Generalitat de Catalunya\.....Antigravity\Dashboard E13BD - còpia\docs\operations\devagent-evidence\devagent-controls\a6-zero-tests_run.json
+96becc55667e7f666855dd8519f684ffc4cfb3f00f8ca9b75eaeee3316ef61b5  C:\Users\GVLLFR0035\OneDrive - Generalitat de Catalunya\.....Antigravity\Dashboard E13BD - còpia\docs\operations\devagent-evidence\devagent-controls\failing-suite_init.json
+5515bd229ccc81fc2574732665099b60ba087f64650bd32ab6b74503d2cde31f  C:\Users\GVLLFR0035\OneDrive - Generalitat de Catalunya\.....Antigravity\Dashboard E13BD - còpia\docs\operations\devagent-evidence\devagent-controls\failing-suite_run.json
+2c1a137570816db8725dcf4a98d7ccd02b75ba5dc3e4bba2f54ff8a00c3a8e81  C:\Users\GVLLFR0035\OneDrive - Generalitat de Catalunya\.....Antigravity\Dashboard E13BD - còpia\docs\operations\devagent-evidence\devagent-controls\false-success_init.json
+4b41c3a6c5861bdb0d13534df508f349869482160debd73272e318961292533e  C:\Users\GVLLFR0035\OneDrive - Generalitat de Catalunya\.....Antigravity\Dashboard E13BD - còpia\docs\operations\devagent-evidence\devagent-controls\false-success_run.json
+93364b4092a34204f0bade4c45c04bd7bbf33079f50383e948aa789ece1b6fe0  C:\dev\dashboard-e13bd-cert\.devagent\evidence\RUN-A788645E738C4D46\AUDIT_RECEIPT.json
+800f09b7723ee8bf6498e8466c306191c858d686dbf93855c8c4bde84bdf3e4d  C:\dev\dashboard-e13bd-cert\.devagent\state\registry.json
+39fe57305bfe1f9a203d8fa8fa833699fd53b8564624d7538bf27c92bf3a324d  C:\dev\dashboard-e13bd-cert\src\web-app\dist\index.html
+5afc0aa12d8424dfdb72195b03fd53727081b362a80547ab9ba3b36045af0535  C:\Users\GVLLFR0035\OneDrive - Generalitat de Catalunya\.....Antigravity\Dashboard E13BD - còpia\docs\operations\devagent-evidence\traceability_v2.json
+1d7329872bcec35f021abb9897401fcd6ff1b446493defa8229c3462e8690e86  C:\Users\GVLLFR0035\OneDrive - Generalitat de Catalunya\.....Antigravity\Dashboard E13BD - còpia\docs\operations\devagent-evidence\independent_verifier.py

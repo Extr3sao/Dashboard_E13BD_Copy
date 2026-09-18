@@ -1,0 +1,440 @@
+{
+  "schema_version": "INDEPENDENT_VERIFICATION_V1",
+  "produced_by": "independent_verifier.py (separate verifier authority; the framework's own verifier is unreachable from the 4.5.1 CLI)",
+  "facts": {
+    "workspace": {
+      "tracked_files": 284,
+      "host_coupled_product_files": [
+        "src/api/fix_mojibake.py",
+        "src/core/import_checks_from_md.py",
+        "src/scripts/import_schema_lots.py",
+        "tests/verify_pdf_refinement.py"
+      ],
+      "undeclared_untracked": []
+    },
+    "logs": "C:\\dev\\e13bd-cert-logs",
+    "expected_commit": "b21f80d6443e663d95268d3f7f3b9b86d8f23db7",
+    "verified_at": "2026-09-18T12:56:56.492843+00:00",
+    "head": "b21f80d6443e663d95268d3f7f3b9b86d8f23db7",
+    "branch": "main",
+    "dirty_entries": [],
+    "devagent_version": {
+      "raw": "DEV Agent 4.5.1 (baseline 4.5.1, 4.3.0 CERTIFIED (CERT-4.3.0-ARCHIFY-CF79888BF56D) + RFC-WORKER-CONTRACT-001 WC-A (common cancellation + timeout normalization) + WC-B (health staleness shadow mode) + RFC-WORKER-HEALTH-ACTIVATION-001 HA-A/HA-B (production health assembly + bounded startup grace, shadow only) + HA-B final-closure rollback-matrix test delta (Gates 3/4) + RFC-WORKER-HEALTH-ACTIVATION-",
+      "stderr": ""
+    },
+    "project_doctor": {
+      "all_ok": true,
+      "boundary_status": "OK",
+      "declaration_pollution": 0,
+      "orphan_reservations": {
+        "count": 0,
+        "run_ids": [],
+        "incomplete_reservations": [],
+        "terminal_without_event": [],
+        "action_required": false
+      },
+      "last_audit": {
+        "run_id": "RUN-A788645E738C4D46",
+        "terminal_state": "AUDITED",
+        "findings": 29,
+        "category_coverage": 1.0,
+        "generated_at": "2026-09-18T12:51:37Z"
+      },
+      "compatibility": {
+        "installed": "4.5.1",
+        "required": ">=4.5",
+        "compatible": true,
+        "status": "COMPATIBLE"
+      },
+      "files_seen": 550,
+      "raw_stderr": ""
+    },
+    "backend": {
+      "log_sha256": "831257fb132925ac1acc169195e8c7b4f00aa34af555192011829448ca02eb75",
+      "passed": 250,
+      "failed": 0,
+      "test_functions_in_source": 218
+    },
+    "frontend": {
+      "log_sha256": "415935589977dfb50d93a2be9bb1e462fcdcf719f911ee8f641c7056639b6b18",
+      "files": 26,
+      "tests": 79,
+      "verifier_rerun": {
+        "exit": 0,
+        "files": 26,
+        "tests": 79
+      }
+    },
+    "frontend_build": {
+      "log_sha256": "3b9307773c549543a9cebefa12db485c04f4e7ab9bf7e52f09bd649ccf30567a",
+      "dist_index_sha256": "39fe57305bfe1f9a203d8fa8fa833699fd53b8564624d7538bf27c92bf3a324d"
+    },
+    "e2e": {
+      "log_sha256": "211497c4593d2d99d2f0c40b4c475f89dce7be0c0dc73a4fe270b8bee1e92dd5",
+      "success_marker": true,
+      "scope": "playwright happy path on the built SPA with mocked API",
+      "verifier_rerun": {
+        "exit": 0,
+        "success": true
+      }
+    },
+    "sqlite_residue": [],
+    "security": {
+      "secret_files": {
+        ".env": {
+          "present": false,
+          "ignored": true,
+          "tracked": false
+        },
+        "config/.env": {
+          "present": false,
+          "ignored": true,
+          "tracked": false
+        },
+        "config/.env.bak": {
+          "present": false,
+          "ignored": true,
+          "tracked": false
+        },
+        "config/Cadena_conexions.txt": {
+          "present": true,
+          "ignored": true,
+          "tracked": false
+        }
+      },
+      "logs_with_secret_shapes": []
+    },
+    "runs": {
+      "reserved": [
+        "RUN-0FB1F3229E5C4406",
+        "RUN-900A6F47276C4B45",
+        "RUN-A788645E738C4D46"
+      ],
+      "terminal_states": {
+        "RUN-0FB1F3229E5C4406": "DISCOVERED",
+        "RUN-900A6F47276C4B45": "AUDITED",
+        "RUN-A788645E738C4D46": "AUDITED"
+      },
+      "terminal_statuses": {
+        "RUN-0FB1F3229E5C4406": "SUCCESS",
+        "RUN-900A6F47276C4B45": "SUCCESS",
+        "RUN-A788645E738C4D46": "SUCCESS"
+      },
+      "multiple_terminal_events": {},
+      "reserved_without_terminal": [],
+      "terminal_status_outside_vocabulary": [],
+      "evidence_note": [
+        "RUN-0FB1F3229E5C4406=DISCOVERED",
+        "RUN-900A6F47276C4B45=AUDITED",
+        "RUN-A788645E738C4D46=AUDITED"
+      ]
+    },
+    "orphan_runs": [],
+    "evidence_authority": [
+      {
+        "run_id": "RUN-0FB1F3229E5C4406",
+        "dir_exists": false,
+        "registry_terminal_state": "DISCOVERED",
+        "registry_status": "SUCCESS",
+        "terminal_receipt_self_binding_matches": true,
+        "artifact_hashes": {}
+      },
+      {
+        "run_id": "RUN-900A6F47276C4B45",
+        "dir_exists": true,
+        "registry_terminal_state": "AUDITED",
+        "registry_status": "SUCCESS",
+        "terminal_receipt_self_binding_matches": true,
+        "receipt_digest_recomputed_matches": true,
+        "artifact_count": 12,
+        "missing_artifacts": [],
+        "product_fingerprint_unchanged": true,
+        "product_files_modified": 0,
+        "project_id": "dashboard-e13bd-2695770f",
+        "terminal_state": "AUDITED",
+        "claimed": [
+          "DISCOVERED",
+          "AUDITED"
+        ],
+        "not_claimed": [
+          "IMPLEMENTING",
+          "IMPLEMENTED",
+          "TESTED",
+          "E2E_VERIFIED",
+          "INDEPENDENTLY_VERIFIED",
+          "CERTIFIED"
+        ],
+        "artifact_hashes": {
+          "ARCHITECTURE_AS_IS.json": "763f73988da45613e42dffce4782742796eacd643a0925a56647e10bf3e3a70e",
+          "ARCHITECTURE_AS_IS.md": "4838d5df23051c9cacdc9e2fc49f8aaa6aba38982de149078a2f831fdfd60bd0",
+          "AUDIT_RECEIPT.json": "5aae2f917e1e2eb4d6bc356b148a5649cc1289bd07fce8e386259aa8b49d1cb3",
+          "DEPENDENCY_MAP.json": "1f8c7440b99259df4d2b84099acd8014b9852b40c1da15fe8e1606c6203e334e",
+          "discovery.json": "f3d5b4265bcc0754a20d71a50e5f5529cdbcfa8f9b6b22b071e580113e2a6bdf",
+          "ENTRYPOINTS.json": "ee9aa5a1504aa47b30fcac37dd346723ba528e78ef854ebfe66566d7a0fed32d",
+          "FOUNDATIONAL_CONTEXT.json": "32cc11dc98738484601b830fee8663dd7492f56bba024539b6d2774edcd9b1da",
+          "FOUNDATIONAL_CONTEXT.md": "d52a47c40cf5bfdfdee9aec6e2afb0a823bbf96cefb351e3d71194c9acc93beb",
+          "GAP_ANALYSIS.json": "2e550234f074f68335627de10b79d492715c088cc02d8e33e8fe232996681bcf",
+          "RISK_REGISTER.json": "90cb0d95ac449702999f7408e1ffb784efe330467276b1186a6b8d046a77b07d",
+          "TECHNICAL_INVENTORY.json": "b5ca6953d18007bd45a1fcc160526235828654759896582dccd715927112d8b5",
+          "UNKNOWNS.json": "797db081829934451ba87eab59cfb3611a51cfa58fe5a5fab95b19c85caafbaf"
+        }
+      },
+      {
+        "run_id": "RUN-A788645E738C4D46",
+        "dir_exists": true,
+        "registry_terminal_state": "AUDITED",
+        "registry_status": "SUCCESS",
+        "terminal_receipt_self_binding_matches": true,
+        "receipt_digest_recomputed_matches": true,
+        "artifact_count": 12,
+        "missing_artifacts": [],
+        "product_fingerprint_unchanged": true,
+        "product_files_modified": 0,
+        "project_id": "dashboard-e13bd-2695770f",
+        "terminal_state": "AUDITED",
+        "claimed": [
+          "DISCOVERED",
+          "AUDITED"
+        ],
+        "not_claimed": [
+          "IMPLEMENTING",
+          "IMPLEMENTED",
+          "TESTED",
+          "E2E_VERIFIED",
+          "INDEPENDENTLY_VERIFIED",
+          "CERTIFIED"
+        ],
+        "artifact_hashes": {
+          "ARCHITECTURE_AS_IS.json": "2155eda10716fd22b920af3b16484079c3b6d3a63149eff4b08a1df58e689431",
+          "ARCHITECTURE_AS_IS.md": "4838d5df23051c9cacdc9e2fc49f8aaa6aba38982de149078a2f831fdfd60bd0",
+          "AUDIT_RECEIPT.json": "93364b4092a34204f0bade4c45c04bd7bbf33079f50383e948aa789ece1b6fe0",
+          "DEPENDENCY_MAP.json": "1f8c7440b99259df4d2b84099acd8014b9852b40c1da15fe8e1606c6203e334e",
+          "discovery.json": "25f1f77151ae9649d86a51749ef4bed330360f591de07de7fe77f89e1ca82113",
+          "ENTRYPOINTS.json": "ee9aa5a1504aa47b30fcac37dd346723ba528e78ef854ebfe66566d7a0fed32d",
+          "FOUNDATIONAL_CONTEXT.json": "a4474ec4748ff0ff538794ad0a16d6a410938cd2ddf659c5a2a6736a8a437494",
+          "FOUNDATIONAL_CONTEXT.md": "17c43ece44e3a682be032c883ac6023cb6899b6169a8549dd661d78debe5b2af",
+          "GAP_ANALYSIS.json": "2e550234f074f68335627de10b79d492715c088cc02d8e33e8fe232996681bcf",
+          "RISK_REGISTER.json": "90cb0d95ac449702999f7408e1ffb784efe330467276b1186a6b8d046a77b07d",
+          "TECHNICAL_INVENTORY.json": "2e87de35c33b8d0347178dbad3f8e98a3f67d26b9e3d08b791312b4b4afe39a2",
+          "UNKNOWNS.json": "797db081829934451ba87eab59cfb3611a51cfa58fe5a5fab95b19c85caafbaf"
+        }
+      }
+    ],
+    "traceability": {
+      "product_verification_coverage": 100.0,
+      "framework_certification_coverage": 0.0,
+      "incomplete_links": [
+        "FW-VERIFY-ROUTING",
+        "FW-TEST-DISCOVERY",
+        "FW-E2E",
+        "FW-INDEPENDENT-VERIFIER",
+        "FW-CERTIFICATION"
+      ],
+      "missing_artifacts": []
+    },
+    "false_success_controls": {
+      "a6_zero_tests_blocked": {
+        "exit_code": null,
+        "blocked_a6_zero_tests": true,
+        "blocked_executed_suite_failed": false,
+        "recorded_run_id": "RUN-48605E66EADF49D1"
+      },
+      "failing_suite_blocked": {
+        "exit_code": null,
+        "blocked_a6_zero_tests": false,
+        "blocked_executed_suite_failed": true,
+        "recorded_run_id": "RUN-FD2CB5F6380C450E"
+      },
+      "cli_certified_without_e2e_or_verifier": {
+        "exit_code": null,
+        "blocked_a6_zero_tests": false,
+        "blocked_executed_suite_failed": false,
+        "recorded_run_id": "RUN-248573DB01424FE9",
+        "state": "CERTIFIED",
+        "certified": true,
+        "e2e_observed": "one-shot: no e2e fixture declared",
+        "tests_run": 1,
+        "claims": [
+          "DISCOVERED",
+          "AUDITED",
+          "ARCHITECTED",
+          "PLANNED",
+          "IMPLEMENTING",
+          "IMPLEMENTED",
+          "TESTED",
+          "E2E_VERIFIED",
+          "INDEPENDENTLY_VERIFIED",
+          "CERTIFIED"
+        ]
+      },
+      "vector_open": true
+    }
+  },
+  "checks": [
+    {
+      "check_id": "CHK-01",
+      "name": "SOURCE_FREEZE",
+      "status": "PASS",
+      "blocking": true,
+      "detail": "HEAD b21f80d6443e on main, working tree clean",
+      "evidence": [
+        "git status --porcelain == empty"
+      ]
+    },
+    {
+      "check_id": "CHK-02",
+      "name": "PROJECT_BOUNDARY",
+      "status": "PASS",
+      "blocking": true,
+      "detail": "{\"all_ok\": true, \"boundary_status\": \"OK\", \"declaration_pollution\": 0, \"orphan_reservations\": {\"count\": 0, \"run_ids\": [], \"incomplete_reservations\": [], \"terminal_without_event\": [], \"action_required\": false}, \"last_audit\": {\"run_id\": \"RUN-A788645E738C4D46\", \"terminal_state\": \"AUDITED\", \"findings\": 2",
+      "evidence": [
+        "devagent project-doctor . --json"
+      ]
+    },
+    {
+      "check_id": "CHK-03",
+      "name": "BACKEND_TESTS",
+      "status": "PASS",
+      "blocking": true,
+      "detail": "250 passed / 0 failed (source declares 218 test functions)",
+      "evidence": [
+        "backend_pytest_v2.log sha256=831257fb132925ac1acc169195e8c7b4f00aa34af555192011829448ca02eb75"
+      ]
+    },
+    {
+      "check_id": "CHK-04",
+      "name": "FRONTEND_TESTS",
+      "status": "PASS",
+      "blocking": true,
+      "detail": "26 files / 79 tests; verifier rerun exit=0 tests=79",
+      "evidence": [
+        "fe_vitest_v2.log sha256=415935589977dfb50d93a2be9bb1e462fcdcf719f911ee8f641c7056639b6b18"
+      ]
+    },
+    {
+      "check_id": "CHK-05",
+      "name": "FRONTEND_BUILD",
+      "status": "PASS",
+      "blocking": true,
+      "detail": "vite build ok, dist/index.html sha256=39fe57305bfe1f9a",
+      "evidence": [
+        "fe_build_v2.log sha256=3b9307773c549543a9cebefa12db485c04f4e7ab9bf7e52f09bd649ccf30567a"
+      ]
+    },
+    {
+      "check_id": "CHK-06",
+      "name": "E2E_MANDATORY",
+      "status": "PASS",
+      "blocking": true,
+      "detail": "playwright happy path reproduced",
+      "evidence": [
+        "fe_smoke_v2.log sha256=211497c4593d2d99d2f0c40b4c475f89dce7be0c0dc73a4fe270b8bee1e92dd5"
+      ]
+    },
+    {
+      "check_id": "CHK-07",
+      "name": "SQLITE_TEST_RESIDUE",
+      "status": "PASS",
+      "blocking": true,
+      "detail": "0 residue files",
+      "evidence": [
+        "filesystem scan"
+      ]
+    },
+    {
+      "check_id": "CHK-08",
+      "name": "CLEAN_WORKSPACE",
+      "status": "PASS",
+      "blocking": true,
+      "detail": "undeclared untracked=[] (inspected 284 tracked files)",
+      "evidence": [
+        "git ls-files content scan",
+        "git status --ignored=matching"
+      ]
+    },
+    {
+      "check_id": "CHK-08B",
+      "name": "HOST_PATH_DEPENDENCE",
+      "status": "FAIL",
+      "blocking": false,
+      "detail": "pre-existing host-coupled files outside runtime/test path: ['src/api/fix_mojibake.py', 'src/core/import_checks_from_md.py', 'src/scripts/import_schema_lots.py', 'tests/verify_pdf_refinement.py']",
+      "evidence": [
+        "git ls-files content scan for C:\\Users\\<user>"
+      ]
+    },
+    {
+      "check_id": "CHK-09",
+      "name": "SECURITY_GATE",
+      "status": "PASS",
+      "blocking": true,
+      "detail": "{\".env\": {\"present\": false, \"ignored\": true, \"tracked\": false}, \"config/.env\": {\"present\": false, \"ignored\": true, \"tracked\": false}, \"config/.env.bak\": {\"present\": false, \"ignored\": true, \"tracked\": false}, \"config/Cadena_conexions.txt\": {\"present\": true, \"ignored\": true, \"tracked\": false}}",
+      "evidence": [
+        "git check-ignore",
+        "log content scan"
+      ]
+    },
+    {
+      "check_id": "CHK-10",
+      "name": "RUN_TERMINALIZATION",
+      "status": "PASS",
+      "blocking": true,
+      "detail": "3 runs, all terminal exactly once",
+      "evidence": [
+        ".devagent/state/registry.json"
+      ]
+    },
+    {
+      "check_id": "CHK-11",
+      "name": "ORPHAN_RUNS",
+      "status": "PASS",
+      "blocking": true,
+      "detail": "0 orphan reservations",
+      "evidence": [
+        "state/reservations vs state/terminal"
+      ]
+    },
+    {
+      "check_id": "CHK-12",
+      "name": "EVIDENCE_AUTHORITY",
+      "status": "PASS",
+      "blocking": true,
+      "detail": "3 run(s): audit receipts self-validating + product fingerprint unchanged (before == after), bootstrap runs DISCOVERED",
+      "evidence": [
+        "recomputed receipt_digest",
+        "terminal receipt binding"
+      ]
+    },
+    {
+      "check_id": "CHK-13",
+      "name": "TRACEABILITY",
+      "status": "PASS",
+      "blocking": true,
+      "detail": "product chain 100.0%, framework chain 0.0%, incomplete=['FW-VERIFY-ROUTING', 'FW-TEST-DISCOVERY', 'FW-E2E', 'FW-INDEPENDENT-VERIFIER', 'FW-CERTIFICATION']",
+      "evidence": [
+        "C:\\Users\\GVLLFR0035\\OneDrive - Generalitat de Catalunya\\.....Antigravity\\Dashboard E13BD - c\u00f2pia\\docs\\operations\\devagent-evidence\\traceability_v2.json"
+      ]
+    },
+    {
+      "check_id": "CHK-14",
+      "name": "FALSE_SUCCESS_CONTROLS",
+      "status": "FAIL",
+      "blocking": true,
+      "detail": "A6 control blocked=True, failing-suite control blocked=True, open CLI false-success vector=True",
+      "evidence": [
+        "control run logs"
+      ]
+    }
+  ],
+  "failed_checks": [
+    "CHK-14"
+  ],
+  "informational_findings": [
+    "CHK-08B"
+  ],
+  "blockers": [
+    "FRAMEWORK_DEFECT: devagent run --intent IMPLEMENTATION can terminalize CERTIFIED with a stubbed e2e_check and no verifier (control run RUN-248573DB01424FE9) -> no framework CERTIFIED receipt is trustworthy",
+    "FRAMEWORK_DEFECT: no routed VERIFY_ONLY execution path; TESTED / E2E_VERIFIED / INDEPENDENTLY_VERIFIED / CERTIFIED are unreachable through the 4.5.1 CLI (observed terminal state: AUDITED)"
+  ],
+  "certification_status": "NOT_CERTIFIED",
+  "report_sha256": "3453aa5ebafcd7768f1118e027f7d6d5f1654740e6a3b2d247950c50f9435f2c"
+}
