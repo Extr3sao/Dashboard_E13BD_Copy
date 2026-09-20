@@ -53,6 +53,29 @@ not evidence that the targets are non-reproducible.
 candidate is not frozen, and the SQLite/PDF/ZIP residue measurement has not yet
 run. No PASS is inferred.
 
+## PDF/ZIP classification update — 2026-09-20
+
+Forensic source/test tracing classifies all 435 files (about 1.36 GB) under
+`resources/test_automation_reports/` as `GENERATED_TEST_RESIDUE`: ignored,
+untracked, no Git history, written by `tests/test_automation.py` from synthetic
+payloads. This includes 55 valid generated ZIPs, generated PDFs/JSON/Markdown,
+three partial error-path artifact groups, retry-cache output, and the three-byte
+`old_run_report.zip` test fixture/residue. Candidate inclusion is `NO`; cleanup
+eligibility is `YES` after active verification completes.
+
+The execution environment rejected the deterministic removal command before it
+started. Thus cleanup did not run; this is recorded as an execution restriction,
+not a retention or classification ambiguity.
+
+### Test-residue repair verification
+
+`tests/test_automation.py` now assigns a private report directory to each test
+and removes it in teardown with Windows-aware retries. Its focused execution
+passed 44/44 in 256.61 seconds; after the run `PRIVATE_REPORT_DIRS=0` and the
+SQLite test-db count remained one pre-existing file. This proves the repaired
+tests do not add persistent PDF/ZIP report residue. The historical shared
+residue remains until an execution environment permits its classified deletion.
+
 ## Secret hygiene (non-disclosing)
 
 - Tracked secret-shaped paths: 1 (`.env.example` only; SHA-256
@@ -65,6 +88,16 @@ run. No PASS is inferred.
   no-credential conclusion.
 - `HUMAN_SECRET_ROTATION_REQUIRED = NOT_DETERMINED`; no real committed
   credential was proven by this non-disclosing inspection.
+
+### Closure classification
+
+The 28 static matches were classified by file location without rendering their
+values: `.env.example` (1), `config/Cadena_conexions.example.txt` (10), README
+(2), implementation configuration/client modules (11), Mail UI (1), and test
+fixtures (1). A targeted all-history path audit returned zero commits for real
+dotenv/connection paths. `SECRET_GATE = PASS_WITH_NONBLOCKING_FINDINGS` and
+`HUMAN_SECRET_ROTATION_REQUIRED = false`; examples and configuration consumers
+remain subject to ordinary deployment secret-management controls.
 
 ## Clean Python installation attempt
 

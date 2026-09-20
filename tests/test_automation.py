@@ -1,6 +1,7 @@
 import io
 import json
 import os
+import shutil
 import sqlite3
 import time
 import unittest
@@ -275,7 +276,7 @@ class TestAutomation(unittest.TestCase):
         self.db_path = unique_path
         self.store = AutomationStore(unique_path)
         self.loader = DummyConfigLoader()
-        self.reports_dir = "resources/test_automation_reports"
+        self.reports_dir = f"resources/test_automation_reports/test_{int(time.time() * 1000000)}"
         os.makedirs(self.reports_dir, exist_ok=True)
 
     def tearDown(self):
@@ -293,6 +294,15 @@ class TestAutomation(unittest.TestCase):
                         break
                     except PermissionError:
                         time.sleep(0.1)
+        # Distribution tests generate real PDF/ZIP output. Use a private
+        # per-test directory and remove it so the suite leaves no report residue.
+        for _ in range(20):
+            try:
+                shutil.rmtree(self.reports_dir, ignore_errors=False)
+                break
+            except PermissionError:
+                gc.collect()
+                time.sleep(0.1)
 
     def test_compute_next_run_weekly(self):
         # TIME_DEPENDENT fix: the weekly schedule semantics are relative to
