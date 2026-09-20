@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Backend and frontend verification
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          cache: pip
+
+      - name: Install Python dependencies
+        run: python -m pip install --upgrade pip; python -m pip install -r requirements.txt
+
+      - name: Backend tests
+        run: python -m pytest -q
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: src/web-app/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: src/web-app
+        run: npm ci
+
+      - name: Frontend lint, tests, and build
+        working-directory: src/web-app
+        run: npm run lint; npm test; npm run build
+
+      - name: Install browser for mocked E2E
+        working-directory: src/web-app
+        run: npx playwright install chromium
+
+      - name: Mocked browser smoke
+        working-directory: src/web-app
+        run: npm run smoke:ui

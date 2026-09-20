@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import {
   ArrowLeftRight,
@@ -112,10 +112,6 @@ function ResultPanel({ title, subtitle, result, loading, tone, exportPrefix }) {
   const safePage = Math.min(page, totalPages);
   const visibleRows = rows.slice((safePage - 1) * pageSize, safePage * pageSize);
   const panelTone = tone === 'right' ? 'border-indigo-200 bg-indigo-50/70' : 'border-slate-200 bg-white';
-
-  useEffect(() => {
-    setPage(1);
-  }, [result]);
 
   return (
     <div className={`rounded-2xl border ${panelTone} shadow-sm`}>
@@ -313,11 +309,10 @@ export default function SQLCodexWorkbench({ originalSql, selectedProfile, profil
   const [comparison, setComparison] = useState(null);
   const [aiAnalysis, setAiAnalysis] = useState(null);
   const [busyAction, setBusyAction] = useState('');
-  const availableProfiles = Array.isArray(profiles) ? profiles.filter(Boolean) : [];
-  const availableProfilesKey = availableProfiles.join('|');
+  const availableProfiles = useMemo(() => (Array.isArray(profiles) ? profiles.filter(Boolean) : []), [profiles]);
   const [executionProfile, setExecutionProfile] = useState(selectedProfile || availableProfiles[0] || '');
 
-  const detectedVariables = detectSqlVariables(leftSql, rightSql);
+  const detectedVariables = useMemo(() => detectSqlVariables(leftSql, rightSql), [leftSql, rightSql]);
 
   useEffect(() => {
     setExecutionProfile((current) => {
@@ -325,7 +320,7 @@ export default function SQLCodexWorkbench({ originalSql, selectedProfile, profil
       if (selectedProfile && (!availableProfiles.length || availableProfiles.includes(selectedProfile))) return selectedProfile;
       return availableProfiles[0] || '';
     });
-  }, [selectedProfile, availableProfilesKey]);
+  }, [selectedProfile, availableProfiles]);
 
   const transformSql = useCallback(async (sourceSql) => {
     setTransforming(true);
@@ -363,7 +358,7 @@ export default function SQLCodexWorkbench({ originalSql, selectedProfile, profil
       });
       return next;
     });
-  }, [leftSql, rightSql]);
+  }, [detectedVariables]);
 
   const buildVariablesPayload = () => detectedVariables.reduce((acc, name) => {
     acc[name] = variables[name] ?? '';

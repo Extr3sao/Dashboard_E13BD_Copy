@@ -156,7 +156,9 @@ def _stream_attachment(
 
 def _raise_internal_http_error(stage: str, exc: Exception) -> None:
     logger.exception("Error intern a %s", stage)
-    raise HTTPException(status_code=500, detail=str(exc)) from exc
+    # Exception text may contain connection strings, file paths, or provider details.
+    # Keep it in the server log while returning a stable, non-sensitive API contract.
+    raise HTTPException(status_code=500, detail="Error intern del servidor") from exc
 
 
 def _run_with_internal_http_error(stage: str, operation):
@@ -1711,7 +1713,7 @@ async def test_db(
         return {"status": "error", "message": "Resposta inesperada de la BBDD"}
     except (RuntimeError, ValueError, TypeError, OSError) as exc:
         logger.warning("Error provant la connexio Oracle", exc_info=exc)
-        return {"status": "error", "message": str(exc)}
+        return {"status": "error", "message": "No s'ha pogut provar la connexio a la BBDD"}
     finally:
         if dbm:
             dbm.close()

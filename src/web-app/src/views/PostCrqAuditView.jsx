@@ -351,7 +351,7 @@ export default function PostCrqAuditView({
     0,
   );
 
-  const effectiveSchedulerOptions = schedulerOptions || {
+  const effectiveSchedulerOptions = React.useMemo(() => schedulerOptions || {
     max_concurrency: 2,
     max_concurrency_upper_bound: 4,
     max_heavy_concurrency: 1,
@@ -359,7 +359,7 @@ export default function PostCrqAuditView({
     max_light_concurrency: 2,
     max_retries: 1,
     enable_auto_throttle: true,
-  };
+  }, [schedulerOptions]);
 
   const schedulerRisk = schedulerRiskAssessment(effectiveSchedulerOptions);
   const activeCriticalityOverrides = React.useMemo(

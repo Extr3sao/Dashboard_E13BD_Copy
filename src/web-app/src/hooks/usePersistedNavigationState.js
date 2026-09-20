@@ -38,13 +38,6 @@ export default function usePersistedNavigationState() {
   });
 
   useEffect(() => {
-    const requestedProfile = getRequestedProfile();
-    if (requestedProfile && requestedProfile !== selectedProfile) {
-      setSelectedProfile(requestedProfile);
-    }
-  }, [selectedProfile]);
-
-  useEffect(() => {
     localStorage.setItem('activeTab', activeTab);
   }, [activeTab]);
 

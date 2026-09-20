@@ -16,7 +16,7 @@
  * PatrÃ³: iguala l'estÃ¨tica glassmorphism/dark del dashboard existent.
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import axios from 'axios';
 import {
   Plus, Pencil, Trash2, RefreshCcw, AlertTriangle, CheckCircle,
@@ -81,78 +81,6 @@ function buildDefaultValidationWindow() {
   };
 }
 
-function formatEngineDate(date, { withTime = true } = {}) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  if (!withTime) return `${year}-${month}-${day}`;
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const seconds = String(date.getSeconds()).padStart(2, '0');
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-}
-
-function buildDefaultEngineVariables() {
-  const end = new Date();
-  const start = new Date(end.getTime() - (24 * 60 * 60 * 1000));
-  return {
-    START_AT: formatEngineDate(start, { withTime: true }),
-    END_AT: formatEngineDate(end, { withTime: true }),
-    START_DATE: formatEngineDate(start, { withTime: false }),
-    END_DATE: formatEngineDate(end, { withTime: false }),
-  };
-}
-
-function detectSqlVariables(...sqlTexts) {
-  const detected = [];
-  sqlTexts
-    .filter(Boolean)
-    .forEach((sql) => {
-      const matches = String(sql).match(/&([A-Z_][A-Z0-9_]*)/gi) || [];
-      matches.forEach((rawMatch) => {
-        const normalized = rawMatch.replace('&', '').toUpperCase();
-        if (!detected.includes(normalized)) detected.push(normalized);
-      });
-    });
-  return detected;
-}
-
-function mergeDetectedVariables(variableNames, currentValues) {
-  const next = { ...currentValues };
-  variableNames.forEach((name) => {
-    if (typeof next[name] === 'undefined') next[name] = '';
-  });
-  return next;
-}
-
-function formatComparisonState(comparison) {
-  if (!comparison) return { label: 'Sense comparar', cls: 'bg-slate-100 text-slate-700 border-slate-200' };
-  if (comparison.status === 'match') return { label: 'Coincideixen', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
-  if (comparison.status === 'warning') return { label: 'Coincideixen amb matisos', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
-  return { label: 'No coincideixen', cls: 'bg-rose-50 text-rose-700 border-rose-200' };
-}
-
-function buildCsv(columns, rows) {
-  const escapeValue = (value) => {
-    const normalized = value == null ? '' : String(value);
-    if (/[",\n]/.test(normalized)) return `"${normalized.replace(/"/g, '""')}"`;
-    return normalized;
-  };
-  const header = columns.map(escapeValue).join(',');
-  const body = (rows || []).map((row) => columns.map((column) => escapeValue(row?.[column])).join(',')).join('\n');
-  return [header, body].filter(Boolean).join('\n');
-}
-
-function downloadBlob(filename, content, mimeType) {
-  const blob = new Blob([content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
 // ─── SQL Codex Playground ───────────────────────────────────────────────────
 
 function SQLCodexPlayground({ originalSql }) {
@@ -162,7 +90,7 @@ function SQLCodexPlayground({ originalSql }) {
   const [copied, setCopied] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
 
-  const transformSql = async () => {
+  const transformSql = useCallback(async () => {
     setLoading(true);
     try {
       const response = await axios.post('/api/checks/transform-sql', {
@@ -176,11 +104,11 @@ function SQLCodexPlayground({ originalSql }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [originalSql]);
 
   useEffect(() => {
     if (originalSql) transformSql();
-  }, [originalSql]);
+  }, [originalSql, transformSql]);
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(transformedSql);
@@ -568,7 +496,7 @@ function CheckModal({ check, onClose, onSaved, selectedProfile, profiles = [] })
   const [showDiff, setShowDiff] = useState(false);
   const [validationResult, setValidationResult] = useState(null);
   const [validatedSignature, setValidatedSignature] = useState('');
-  const availableProfiles = Array.isArray(profiles) ? profiles.filter(Boolean) : [];
+  const availableProfiles = useMemo(() => (Array.isArray(profiles) ? profiles.filter(Boolean) : []), [profiles]);
   const [validationProfile, setValidationProfile] = useState(selectedProfile || availableProfiles[0] || '');
   const [validationWindow, setValidationWindow] = useState(() => buildDefaultValidationWindow());
 

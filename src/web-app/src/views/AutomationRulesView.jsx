@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   listAutomationTasks,
@@ -28,7 +28,7 @@ export default function AutomationRulesView() {
     [tasks],
   );
 
-  async function loadData(status = taskStatus) {
+  const loadData = useCallback(async (status = taskStatus) => {
     setLoading(true);
     setError('');
     try {
@@ -43,11 +43,11 @@ export default function AutomationRulesView() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [taskStatus]);
 
   useEffect(() => {
     loadData('');
-  }, []);
+  }, [loadData]);
 
   async function handleRuleToggle(rule) {
     const updated = await updateSeverityRule(rule.id, { enabled: !rule.enabled });

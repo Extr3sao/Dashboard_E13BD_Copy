@@ -1,0 +1,34 @@
+# Verification — certification closure
+
+This record starts from the authoritative user-supplied baseline: backend
+251/251, Oracle 41/41, frontend 79/79, lint/build/mock E2E and npm audit zero.
+Those results are not repeated unless a later source fingerprint invalidates
+their authority. New records will distinguish direct execution from historical
+evidence and will never infer a passing gate.
+
+## Continuation observations
+
+| Gate | Direct observation | Status |
+|---|---|---|
+| Workspace inventory | Deterministic non-disclosing inventory recorded in `docs/reports/WORKSPACE_CLEANLINESS_REPORT.md`. | PASS (inventory only) |
+| Safe cleanup | Executor rejected the removal command before execution; protected artifacts remain. | INCOMPLETE |
+| Fresh Python install | Isolated venv created; pip resolution did not conclude within executor window. | INCOMPLETE |
+| Framework source authority | Repair source is clean at `6378d2bf`, but immutable 4.5.1 pins intentionally differ and release approval is pending. | BLOCKED pending independent verification/release governance |
+
+## Independent framework-verifier evidence
+
+Verifier source: `C:\dev\devagent-fw`, HEAD
+`6378d2bf586d87e25fa33a5929e4055613797b5b`. The verifier independently observed:
+
+| Check | Result |
+|---|---|
+| Six targeted real CASE/CLI tests (zero/failing tests, no-E2E/trivial false-cert, builder-E2E inadmissibility, VERIFY_ONLY routing) | PASS, 6 in 22.28s |
+| Receipt tamper probe | PASS: baseline valid, digest recomputed, 11/11 mutations detected |
+| Human-gate policy tests | PASS, 5; release policy reports `APPROVAL_REQUIRED` |
+| Four release-pin controls | FAIL as expected/intentional: repaired full/core hashes `83ac5e38…a500`/`551bf201…a886` differ from sealed 4.5.1 `e6116bdb…4933`/`2dc8f989…9f75` |
+
+The verifier did not treat the intentionally failing identity pins as a passing
+successor release. It also found that declared base commit `ddb00aeb…` is absent
+locally, and that no technical command gate currently binds a successor
+re-seal/installation to the human approval record. Full-suite output was not
+captured and is therefore unasserted. `FRAMEWORK_INDEPENDENT_VERIFIER = PARTIAL`.

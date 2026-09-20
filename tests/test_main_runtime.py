@@ -11,6 +11,16 @@ from src.api import main
 
 
 class TestMainRuntime(unittest.IsolatedAsyncioTestCase):
+    def test_internal_error_does_not_expose_exception_text(self):
+        with self.assertRaises(HTTPException) as ctx:
+            main._run_with_internal_http_error(
+                "demo", lambda: (_ for _ in ()).throw(RuntimeError("PASSWORD=secret"))
+            )
+
+        self.assertEqual(ctx.exception.status_code, 500)
+        self.assertEqual(ctx.exception.detail, "Error intern del servidor")
+        self.assertNotIn("secret", ctx.exception.detail)
+
     def test_run_with_internal_http_error_preserves_http_exception(self):
         expected = HTTPException(status_code=404, detail="missing")
 
@@ -119,7 +129,8 @@ class TestMainRuntime(unittest.IsolatedAsyncioTestCase):
             await main.get_dashboard_stats(["APP_A"], "E13DB")
 
         self.assertEqual(ctx.exception.status_code, 500)
-        self.assertIn("audit failed", ctx.exception.detail)
+        self.assertEqual(ctx.exception.detail, "Error intern del servidor")
+        self.assertNotIn("audit failed", ctx.exception.detail)
         dbm.close.assert_called_once()
 
     @patch("src.api.main._resolve_profile_key", return_value="E13DB")
@@ -200,7 +211,8 @@ class TestMainRuntime(unittest.IsolatedAsyncioTestCase):
             await main.run_audit(["APP_A"], "E13DB")
 
         self.assertEqual(ctx.exception.status_code, 500)
-        self.assertIn("query failed", ctx.exception.detail)
+        self.assertEqual(ctx.exception.detail, "Error intern del servidor")
+        self.assertNotIn("query failed", ctx.exception.detail)
         dbm.close.assert_called_once()
 
     @patch("src.api.main.internal_db.get_queries")
@@ -507,7 +519,8 @@ class TestMainRuntime(unittest.IsolatedAsyncioTestCase):
             await main.execute_query("SELECT 1 FROM dual", "E13DB")
 
         self.assertEqual(ctx.exception.status_code, 500)
-        self.assertIn("sql boom", ctx.exception.detail)
+        self.assertEqual(ctx.exception.detail, "Error intern del servidor")
+        self.assertNotIn("sql boom", ctx.exception.detail)
         dbm.close.assert_called_once()
 
     @patch("src.api.main.OracleDBManager")
@@ -519,7 +532,8 @@ class TestMainRuntime(unittest.IsolatedAsyncioTestCase):
         result = await main.test_db(user="u", password="p", dsn="db", profile="")
 
         self.assertEqual(result["status"], "error")
-        self.assertIn("oracle down", result["message"])
+        self.assertEqual(result["message"], "No s'ha pogut provar la connexio a la BBDD")
+        self.assertNotIn("oracle down", result["message"])
         dbm.close.assert_called_once()
 
     @patch("src.api.main._raise_internal_http_error", side_effect=HTTPException(status_code=500, detail="wrapped"))
