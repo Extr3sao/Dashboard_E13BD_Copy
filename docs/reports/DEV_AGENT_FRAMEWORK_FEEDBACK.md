@@ -43,3 +43,12 @@ Keep `VERIFICATION_ENVIRONMENT_PROVENANCE`, `ADAPTIVE_TEST_WATCHDOG`,
 Keep `MODEL_ORCHESTRATION_DECOUPLING`, DecisionGateway, ModelGateway and Jev as
 P2 experimental/shadow-only work. Jev has no certification authority and is not
 activated by this certification closure.
+# Next evolution feedback — 2026-09-20
+
+## Dependency resolution must be a verifiable release gate
+
+- **Problem:** A project can have a valid-looking unpinned `requirements.txt` while a clean install backtracks for an extended period and initially leaves required imports unavailable.
+- **E13BD evidence:** The 2026-09-20 focused runtime gate initially could not import FastAPI/xhtml2pdf; `pip install -r requirements.txt` resolved the broad Google dependency graph slowly without a reproducible lock outcome.
+- **Generalization:** DEV Agent should distinguish a manifest syntax check from a completed clean, isolated dependency resolution and report partial environments as a failed/incomplete gate.
+- **Proposed DEV Agent capability:** Isolated-install evidence adapter that records interpreter, hashes/locked versions, resolver exit state, and import smoke results before allowing test evidence.
+- **Acceptance test:** A fixture with unpinned conflicting/transitive dependencies must not be reported as reproducibly installed until an isolated environment completes and imports declared runtime roots.

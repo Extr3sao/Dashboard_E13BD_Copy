@@ -11,9 +11,11 @@ import glob
 import re
 import shutil
 import copy
+import time
+import uuid
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Body, Request
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Any, List, Optional, Dict
@@ -67,6 +69,7 @@ from src.api.checks_admin_router import router as checks_admin_router
 
 
 SCHEMA_NAME_PATTERN = re.compile(r"^[A-Z][A-Z0-9_$#]*$")
+REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 logger = logging.getLogger(__name__)
 
 # Managers globals
@@ -110,6 +113,37 @@ app.add_middleware(
 )
 
 from starlette.middleware.base import BaseHTTPMiddleware
+
+
+class RequestObservabilityMiddleware(BaseHTTPMiddleware):
+    """Attach a safe correlation ID and emit one redacted completion event."""
+
+    async def dispatch(self, request: Request, call_next):
+        supplied_request_id = request.headers.get("x-request-id", "")
+        request_id = supplied_request_id if REQUEST_ID_PATTERN.fullmatch(supplied_request_id) else str(uuid.uuid4())
+        started_at = time.perf_counter()
+        try:
+            response = await call_next(request)
+        except Exception:
+            # ServerErrorMiddleware would otherwise construct this 500 outside
+            # this middleware, losing the correlation header and completion event.
+            response = JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
+        duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
+        response.headers["X-Request-ID"] = request_id
+        logger.info(
+            "request_completed",
+            extra={
+                "event": "request_completed",
+                "request_id": request_id,
+                "method": request.method,
+                "path": request.url.path,
+                "status_code": response.status_code,
+                "duration_ms": duration_ms,
+            },
+        )
+        return response
+
+
 class FrameOptionsMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
@@ -120,6 +154,19 @@ class FrameOptionsMiddleware(BaseHTTPMiddleware):
         return response
 
 app.add_middleware(FrameOptionsMiddleware)
+app.add_middleware(RequestObservabilityMiddleware)
+
+
+@app.get("/healthz")
+async def healthz() -> Dict[str, str]:
+    """Dependency-free liveness for process supervisors and load balancers."""
+    return {"status": "ok", "service": "oracle-audit-api"}
+
+
+@app.get("/readyz")
+async def readyz() -> Dict[str, str]:
+    """Local-process readiness; optional external systems are not probed here."""
+    return {"status": "ready", "service": "oracle-audit-api"}
 
 
 def _resolve_profile_key(profile_value: Optional[str], profiles: Dict) -> Optional[str]:

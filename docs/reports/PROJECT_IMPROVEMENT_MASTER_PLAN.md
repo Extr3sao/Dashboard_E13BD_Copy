@@ -4,6 +4,19 @@
 
 Make Dashboard E13BD a reproducible, secure and operable internal control platform: reliable locally, independently verifiable in CI, auditable around Oracle actions, and clear for operational users.
 
+## Next evolution status — 2026-09-20
+
+| ID | Status | Update |
+|---|---|---|
+| IMP-001 | IN_PROGRESS | Unpinned dependencies were reconfirmed when a local clean install backtracked over Google dependencies and initially left imports unavailable. Lock/constraints remains the reversible next action. |
+| IMP-002 | DONE | Existing credential-free Windows CI workflow remains the prescribed regression gate. |
+| IMP-003 | BLOCKED | DEV Agent successor verification remains external to this workspace. |
+| IMP-008 / IMP-022 | IN_PROGRESS | Request-level safe correlation, duration and result logging plus `/healthz` and `/readyz` are implemented. Job/delivery propagation remains planned. |
+| IMP-009 | PLANNED | Existing retry locks are present; scheduler singleton behavior across processes is not yet demonstrated. |
+| IMP-012 / IMP-020 | BLOCKED | Identity and authorization require an IdP/role decision. |
+| IMP-013 | PLANNED | PDF/ZIP manifest-based recovery remains unimplemented. |
+| IMP-014 | PLANNED | Prior test performance profile is retained; no product workload benchmark exists. |
+
 ## What works well
 
 FastAPI/React separation, SQLite path isolation, a substantial backend/frontend suite, mocked browser smoke, data bootstrap, and explicit real-Oracle opt-in are solid foundations.

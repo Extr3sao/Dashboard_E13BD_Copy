@@ -1,13 +1,13 @@
 import pandas as pd
-import cx_Oracle
+import oracledb
 from sqlalchemy import create_engine
 from core.adapters.base import BaseAdapter
 import os
 
 class OracleAdapter(BaseAdapter):
     def connect(self):
-        # Oracle connection string format: oracle+cx_oracle://user:password@host:port/?service_name=service
-        db_url = f"oracle+cx_oracle://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/?service_name={os.getenv('DB_SERVICE')}"
+        # Oracle connection string format supported by the declared python-oracledb driver.
+        db_url = f"oracle+oracledb://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/?service_name={os.getenv('DB_SERVICE')}"
         self.engine = create_engine(db_url)
         self.connection = self.engine.connect()
 

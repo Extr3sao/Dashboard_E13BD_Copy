@@ -4,6 +4,8 @@ __pycache__/
 *$py.class
 .venv/
 .venv314/
+.venv-repro/
+.venv-repro-2/
 .pydeps314/
 .pytest_cache/
 .coverage

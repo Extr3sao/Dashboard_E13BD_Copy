@@ -5,12 +5,71 @@ from unittest.mock import mock_open
 from unittest.mock import AsyncMock, Mock, patch
 
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
 import pandas as pd
+from starlette.requests import Request
 
 from src.api import main
 
 
 class TestMainRuntime(unittest.IsolatedAsyncioTestCase):
+    def test_operational_endpoints_and_request_observability_contract(self):
+        with TestClient(main.app) as client:
+            health_response = client.get("/healthz", headers={"X-Request-ID": "ops-42"})
+            ready_response = client.get("/readyz", headers={"X-Request-ID": "invalid value"})
+
+        self.assertEqual(health_response.status_code, 200)
+        self.assertEqual(health_response.json(), {"status": "ok", "service": "oracle-audit-api"})
+        self.assertEqual(health_response.headers["x-request-id"], "ops-42")
+        self.assertEqual(ready_response.status_code, 200)
+        self.assertEqual(ready_response.json(), {"status": "ready", "service": "oracle-audit-api"})
+        self.assertRegex(ready_response.headers["x-request-id"], r"^[0-9a-f-]{36}$")
+
+    def test_request_completion_log_is_redacted_and_correlated(self):
+        with patch.object(main.logger, "info") as log_info:
+            with TestClient(main.app) as client:
+                response = client.get("/healthz?password=secret", headers={"X-Request-ID": "audit-123"})
+
+        self.assertEqual(response.status_code, 200)
+        completion_call = next(call for call in log_info.call_args_list if call.args[0] == "request_completed")
+        self.assertEqual(completion_call.kwargs["extra"]["request_id"], "audit-123")
+        self.assertEqual(completion_call.kwargs["extra"]["path"], "/healthz")
+        self.assertNotIn("password=secret", str(completion_call.kwargs["extra"]))
+
+    def test_request_observability_covers_4xx_and_unhandled_5xx_without_leaking_secrets(self):
+        with patch.object(main.logger, "info") as log_info:
+            with patch.object(main.config_loader, "load_connections", side_effect=RuntimeError("token=secret")):
+                with TestClient(main.app) as client:
+                    not_found = client.post("/healthz?password=secret", headers={"X-Request-ID": "safe-404"})
+                    server_error = client.get("/api/profiles?token=secret", headers={"X-Request-ID": "safe-500"})
+
+        self.assertEqual(not_found.status_code, 405)
+        self.assertEqual(not_found.headers["x-request-id"], "safe-404")
+        self.assertEqual(server_error.status_code, 500)
+        self.assertEqual(server_error.headers["x-request-id"], "safe-500")
+        completions = [call.kwargs["extra"] for call in log_info.call_args_list if call.args[0] == "request_completed"]
+        self.assertEqual({entry["status_code"] for entry in completions}, {405, 500})
+        self.assertTrue(all(entry["duration_ms"] >= 0 for entry in completions))
+        logged = str(completions)
+        for secret in ("password=secret", "token=secret", "Authorization", "Cookie"):
+            self.assertNotIn(secret, logged)
+
+    async def test_request_observability_wraps_unhandled_5xx_with_correlation(self):
+        request = Request({"type": "http", "method": "GET", "path": "/boom", "headers": [(b"x-request-id", b"safe-boom")]})
+
+        async def fail(_request):
+            raise RuntimeError("password=secret")
+
+        with patch.object(main.logger, "info") as log_info:
+            response = await main.RequestObservabilityMiddleware(main.app).dispatch(request, fail)
+
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.headers["x-request-id"], "safe-boom")
+        completion = log_info.call_args.kwargs["extra"]
+        self.assertEqual(completion["status_code"], 500)
+        self.assertEqual(completion["path"], "/boom")
+        self.assertNotIn("secret", str(completion))
+
     def test_internal_error_does_not_expose_exception_text(self):
         with self.assertRaises(HTTPException) as ctx:
             main._run_with_internal_http_error(

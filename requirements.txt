@@ -13,6 +13,8 @@ fastparquet
 oracledb
 openpyxl
 fastapi
+pydantic
+starlette
 httpx
 uvicorn
 python-multipart
@@ -21,4 +23,5 @@ reportlab
 requests
 xhtml2pdf
 pytest
+mcp
 google-generativeai
