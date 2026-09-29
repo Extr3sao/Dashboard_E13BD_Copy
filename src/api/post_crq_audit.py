@@ -50,6 +50,7 @@ from src.api.post_crq_scheduler import (
     run_scheduled_tasks,
     timeout_for_category,
 )
+from src.api.post_crq_rule_adapter import definition_from_post_crq, result_from_post_crq
 from src.core.db_manager import OracleDBManager
 from src.core.sqlite_paths import resolve_sqlite_path
 
@@ -4059,6 +4060,14 @@ def run_post_crq_audit(
         executed_checks=executed_checks,
     )
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    rule_definitions = {
+        item["check_id"]: definition_from_post_crq(
+            item, timeout=timeout_for_category(scheduler_config, classify_check_category(item["check_id"], item.get("sql") or ""))
+        ) for item in available_checks
+    }
+    # `profile` is the existing stable, user-visible target label. It is deliberately
+    # not derived from a DSN, which could expose credentials in finding identity.
+    rule_results = [result_from_post_crq(item, str(profile), rule_definitions[item["check_id"]]).to_dict() for item in executed_checks]
     return {
         "audit_type": "post_crq",
         "report_options": {
@@ -4105,6 +4114,7 @@ def run_post_crq_audit(
         "finding_envelopes": finding_envelopes,
         "report_model": report_model,
         "results_by_check": executed_checks,
+        "rule_results": rule_results,
         "query_export": {
             "filename": f"consultes_post_crq_{profile}_{timestamp}.txt",
             "content": queries_txt,
