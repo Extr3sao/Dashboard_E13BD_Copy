@@ -8,6 +8,7 @@ import re
 import smtplib
 import threading
 import time
+import uuid
 import zipfile
 from email.message import EmailMessage
 from pathlib import Path
@@ -53,6 +54,7 @@ DELIVERY_RESULT_ATTACHMENT_ERROR = "attachment_error"
 DELIVERY_RESULT_SKIPPED_NO_FINDINGS = "skipped_no_findings"
 DELIVERY_RESULT_SKIPPED_NOT_APPLICABLE = "skipped_not_applicable"
 DELIVERY_RESULT_MANUAL_REVIEW = "manual_review"
+MANUAL_RETRY_ALLOWLIST = {"failed"}
 logger = logging.getLogger(__name__)
 
 
@@ -215,6 +217,10 @@ class AutomationService:
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
             return
+        stale_before = iso_utc(utc_now() - dt.timedelta(minutes=RETRY_STALE_LOCK_MINUTES))
+        recovered = self.store.recover_stale_runs(stale_before=stale_before)
+        if recovered:
+            logger.warning("Recovered stale automation runs", extra={"run_ids": recovered})
         self._stop_event.clear()
         self._thread = threading.Thread(target=self._run_loop, name="automation-scheduler", daemon=True)
         self._thread.start()
@@ -1440,7 +1446,9 @@ class AutomationService:
         config["smtp_host"] = config.get("smtp_host") or self.config_loader.get_env_var("SMTP_HOST", "")
         config["smtp_port"] = int(config.get("smtp_port") or self.config_loader.get_env_var("SMTP_PORT", 587) or 587)
         config["smtp_username"] = config.get("smtp_username") or self.config_loader.get_env_var("SMTP_USERNAME", "")
-        config["smtp_password"] = config.get("smtp_password") or self.config_loader.get_env_var("SMTP_PASSWORD", "")
+        # SMTP credentials are runtime secrets only; delivery_config deliberately
+        # never stores or returns them.
+        config["smtp_password"] = self.config_loader.get_env_var("SMTP_PASSWORD", "")
         config["from_email"] = config.get("from_email") or self.config_loader.get_env_var("SMTP_FROM_EMAIL", "")
         if not config.get("default_recipients"):
             raw = self.config_loader.get_env_var("SMTP_DEFAULT_RECIPIENTS", "")
@@ -2006,6 +2014,9 @@ class AutomationService:
         run = self.store.get_run(run_id)
         if not run:
             raise ValueError("Execucio no trobada")
+        eligibility_error = self._manual_retry_eligibility_error(run_id=run_id, lot=lot, audience=audience)
+        if eligibility_error:
+            raise ValueError(eligibility_error)
         return self._queue_retry(
             run_id=run_id,
             job_id=run.get("job_id"),
@@ -2018,11 +2029,41 @@ class AutomationService:
             force_status="pending",
         )
 
+    def _manual_retry_eligibility_error(self, *, run_id: int, lot: Optional[str], audience: str) -> Optional[str]:
+        attempts = self.store.list_delivery_attempts(run_id=run_id, lot=lot, audience=audience, limit=1)
+        if not attempts:
+            return "Reintent bloquejat: no hi ha cap intent de lliurament verificable"
+        latest_status = str(attempts[0].get("status") or "").strip().lower()
+        normalized_status = {"ok": "sent", "error": "failed"}.get(latest_status, latest_status)
+        blocked_reasons = {
+            "sent": "Reintent bloquejat: el lliurament ja consta com enviat; s'eviten duplicats",
+            "in_progress": "Reintent bloquejat: el lliurament encara esta en curs",
+            "unknown_delivery_outcome": "Reintent bloquejat: el resultat extern es desconeix; no es reenvia automaticament",
+        }
+        if normalized_status in MANUAL_RETRY_ALLOWLIST:
+            return None
+        return blocked_reasons.get(
+            normalized_status,
+            "Reintent bloquejat: l'estat de lliurament no es pot verificar amb seguretat",
+        )
+
     def process_retry_queue_item(self, queue_id: int, *, auto_claimed: bool = False) -> Dict[str, Any]:
-        items = self.store.list_retry_queue(queue_id=queue_id)
-        if not items:
-            raise ValueError("Element de cua no trobat")
-        queue_item = items[0]
+        if auto_claimed:
+            items = self.store.list_retry_queue(queue_id=queue_id)
+            if not items:
+                raise ValueError("Element de cua no trobat")
+            queue_item = items[0]
+        else:
+            queue_item = self.store.claim_manual_retry_queue_item(
+                queue_id,
+                lock_token=f"manual-lock-{uuid.uuid4().hex}",
+                now_iso=iso_utc(utc_now()),
+            )
+            if not queue_item:
+                current = self.store.list_retry_queue(queue_id=queue_id)
+                if not current:
+                    raise ValueError("Element de cua no trobat")
+                return current[0]
         run = self.store.get_run(int(queue_item["run_id"])) if queue_item.get("run_id") else None
         if not run:
             raise ValueError("Execucio associada no trobada")
@@ -2034,14 +2075,14 @@ class AutomationService:
         attempts_made = int(queue_item.get("attempts_made") or 0) + 1
         retry_mode = str(queue_item.get("retry_mode") or "manual")
         max_attempts = int(queue_item.get("max_attempts") or 4)
-        if not auto_claimed:
-            self.store.update_retry_queue_item(
+        eligibility_error = self._manual_retry_eligibility_error(run_id=int(run["id"]), lot=lot, audience=audience)
+        if eligibility_error:
+            return self._mark_retry_queue_item_failed(
                 queue_id,
-                {
-                    "status": "in_progress",
-                    "lock_token": f"manual-lock-{iso_utc(utc_now())}",
-                    "locked_at": iso_utc(utc_now()),
-                },
+                queue_item=queue_item,
+                attempts_made=attempts_made,
+                error_message=eligibility_error,
+                error_class=DELIVERY_RESULT_MANUAL_REVIEW,
             )
         recipients, dispatch, attachment_path = self._build_retry_payload(queue_item, run=run, job=job)
         if dispatch.get("attachment_required", True) and not attachment_path:

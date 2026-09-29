@@ -1538,6 +1538,9 @@ class TestAutomation(unittest.TestCase):
         service = AutomationService(self.store, self.loader, reports_dir=self.reports_dir)
         FakeSMTP.sent_messages = []
         run = service.execute_job(job["id"], manual=True)
+        self.store.create_delivery_attempt(
+            {"run_id": run["id"], "job_id": job["id"], "lot": "LOT_EMPTY", "audience": "provider", "status": "failed"}
+        )
         queue_item = service.enqueue_manual_retry(run_id=run["id"], lot="LOT_EMPTY", audience="provider", requested_by="tester")
 
         processed = service.process_retry_queue_item(queue_item["id"])
@@ -1704,6 +1707,10 @@ class TestAutomation(unittest.TestCase):
         service = AutomationService(self.store, self.loader, reports_dir=self.reports_dir)
         FakeSMTP.sent_messages = []
         run = service.execute_job(job["id"], manual=True)
+        for lot in ("LOT_APP", "LOT_EMPTY"):
+            self.store.create_delivery_attempt(
+                {"run_id": run["id"], "job_id": job["id"], "lot": lot, "audience": "provider", "status": "failed"}
+            )
         failing_item = service.enqueue_manual_retry(run_id=run["id"], lot="LOT_APP", audience="provider", requested_by="tester")
         valid_item = service.enqueue_manual_retry(run_id=run["id"], lot="LOT_EMPTY", audience="provider", requested_by="tester")
         self.store.update_retry_queue_item(failing_item["id"], {"retry_mode": "auto", "next_attempt_at": "2000-01-01T00:00:00Z"})
@@ -1766,6 +1773,9 @@ class TestAutomation(unittest.TestCase):
 
         service = AutomationService(self.store, self.loader, reports_dir=self.reports_dir)
         run = service.execute_job(job["id"], manual=True)
+        self.store.create_delivery_attempt(
+            {"run_id": run["id"], "job_id": job["id"], "lot": "LOT_APP", "audience": "provider", "status": "failed"}
+        )
         queue_item = service.enqueue_manual_retry(run_id=run["id"], lot="LOT_APP", audience="provider", requested_by="tester")
 
         with patch.object(service, "_send_email_with_tracking", side_effect=RuntimeError("retry down")):

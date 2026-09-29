@@ -13,8 +13,9 @@ import shutil
 import copy
 import time
 import uuid
+import secrets
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Body, Request
+from fastapi import FastAPI, HTTPException, Body, Depends, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -66,11 +67,15 @@ from src.api.report_builder import (
     build_standard_pdf)
 from src.core.automation_store import AutomationStore
 from src.api.checks_admin_router import router as checks_admin_router
+from src.api.security import SecretProvider, SessionStore, SQLExecutionPolicy, redact_secrets, require_csrf, require_user
 
 
 SCHEMA_NAME_PATTERN = re.compile(r"^[A-Z][A-Z0-9_$#]*$")
 REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 logger = logging.getLogger(__name__)
+secret_provider = SecretProvider()
+session_store = SessionStore(ttl_seconds=int(secret_provider.get("E13DB_SESSION_TTL_SECONDS", "3600") or "3600"))
+SESSION_COOKIE_NAME = "e13db_session"
 
 # Managers globals
 config_loader = ConfigLoader()
@@ -82,11 +87,17 @@ automation_service = AutomationService(automation_store, config_loader)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    automation_service.start()
+    scheduler_enabled = (secret_provider.get("E13DB_SCHEDULER_ENABLED", "false") or "false").lower() == "true"
+    if scheduler_enabled:
+        automation_service.start()
+        logger.info("automation_scheduler_started")
+    else:
+        logger.info("automation_scheduler_disabled")
     try:
         yield
     finally:
-        automation_service.stop()
+        if scheduler_enabled:
+            automation_service.stop()
 
 
 app = FastAPI(title="Oracle Audit API", version="4.6", lifespan=lifespan)
@@ -94,22 +105,17 @@ logger.info("Starting Oracle Audit API v4.6 (Query Management Module Active)")
 app.include_router(checks_admin_router)
 
 # Configurar CORS per permetre al frontend de React (Vite) connectar-se
+def _cors_origins() -> list[str]:
+    raw = secret_provider.get("E13DB_CORS_ORIGINS", "http://localhost:5173") or ""
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:5175",
-        "http://localhost:8000",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:3001",
-        "http://127.0.0.1:3001",
-        "http://localhost:8011",
-    ],
+    allow_origins=_cors_origins(),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "X-CSRF-Token", "X-Request-ID"],
 )
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -157,6 +163,24 @@ app.add_middleware(FrameOptionsMiddleware)
 app.add_middleware(RequestObservabilityMiddleware)
 
 
+class ApiSecurityMiddleware(BaseHTTPMiddleware):
+    """Apply USER cookie and CSRF policy consistently to the browser API."""
+    async def dispatch(self, request: Request, call_next):
+        if (secret_provider.get("E13DB_AUTH_REQUIRED", "true") or "true").lower() != "true":
+            return await call_next(request)
+        if not request.url.path.startswith("/api/") or request.method == "OPTIONS":
+            return await call_next(request)
+        principal = session_store.principal(request.cookies.get(SESSION_COOKIE_NAME))
+        if principal is None or principal.role != "USER":
+            return JSONResponse(status_code=401, content={"detail": "Authentication required"})
+        if request.method not in {"GET", "HEAD", "OPTIONS"} and not session_store.validate_csrf(principal.session_id, request.headers.get("x-csrf-token")):
+            return JSONResponse(status_code=403, content={"detail": "Invalid CSRF token"})
+        return await call_next(request)
+
+
+app.add_middleware(ApiSecurityMiddleware)
+
+
 @app.get("/healthz")
 async def healthz() -> Dict[str, str]:
     """Dependency-free liveness for process supervisors and load balancers."""
@@ -167,6 +191,68 @@ async def healthz() -> Dict[str, str]:
 async def readyz() -> Dict[str, str]:
     """Local-process readiness; optional external systems are not probed here."""
     return {"status": "ready", "service": "oracle-audit-api"}
+
+
+@app.get("/health")
+async def health() -> Dict[str, str]:
+    return await healthz()
+
+
+@app.get("/ready")
+async def ready() -> Dict[str, str]:
+    return await readyz()
+
+
+@app.get("/status")
+async def runtime_status() -> Dict[str, Any]:
+    return {
+        "status": "ok",
+        "service": "oracle-audit-api",
+        "scheduler_enabled": (secret_provider.get("E13DB_SCHEDULER_ENABLED", "false") or "false").lower() == "true",
+        "sqlite_path": str(automation_store.db_path),
+    }
+
+
+def _set_session_cookie(response: Response, session_id: str) -> None:
+    response.set_cookie(
+        SESSION_COOKIE_NAME,
+        session_id,
+        httponly=True,
+        secure=(secret_provider.get("E13DB_COOKIE_SECURE", "false") or "false").lower() == "true",
+        samesite="lax",
+        max_age=int(secret_provider.get("E13DB_SESSION_TTL_SECONDS", "3600") or "3600"),
+        path="/",
+    )
+
+
+@app.post("/auth/login")
+async def auth_login(request: Request, payload: Dict[str, str] = Body(...), response: Response = None) -> Dict[str, str]:
+    username = str(payload.get("username") or "")
+    password = str(payload.get("password") or "")
+    configured_username = secret_provider.get("E13DB_USER_USERNAME")
+    configured_password = secret_provider.get("E13DB_USER_PASSWORD")
+    if not configured_username or not configured_password or not secrets.compare_digest(username, configured_username) or not secrets.compare_digest(password, configured_password):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    # Rotate the browser's pre-login identifier to defeat session fixation.
+    session_store.revoke(request.cookies.get(SESSION_COOKIE_NAME))
+    session_id = session_store.create(username, "USER")
+    _set_session_cookie(response, session_id)
+    return {"username": username, "role": "USER", "csrf_token": session_store.csrf_token(session_id) or ""}
+
+
+@app.get("/auth/me")
+async def auth_me(request: Request) -> Dict[str, str]:
+    principal = session_store.principal(request.cookies.get(SESSION_COOKIE_NAME))
+    if principal is None or principal.role != "USER":
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return {"username": principal.subject, "role": principal.role, "csrf_token": session_store.csrf_token(principal.session_id or "") or ""}
+
+
+@app.post("/auth/logout")
+async def auth_logout(request: Request, response: Response, _: None = Depends(require_csrf(session_store, SESSION_COOKIE_NAME))) -> Dict[str, str]:
+    session_store.revoke(request.cookies.get(SESSION_COOKIE_NAME))
+    response.delete_cookie(SESSION_COOKIE_NAME, path="/")
+    return {"status": "ok"}
 
 
 def _resolve_profile_key(profile_value: Optional[str], profiles: Dict) -> Optional[str]:
@@ -1292,15 +1378,19 @@ async def update_automation_rule(rule_id: int, payload: Dict = Body(...)):
 
 @app.get("/api/automation/delivery-config")
 async def get_automation_delivery_config():
-    return _run_with_internal_http_error("get_automation_delivery_config", automation_store.get_delivery_config)
+    return _run_with_internal_http_error(
+        "get_automation_delivery_config",
+        lambda: redact_secrets(automation_store.get_delivery_config()),
+    )
 
 
 @app.put("/api/automation/delivery-config")
 async def update_automation_delivery_config(payload: Dict = Body(...)):
-    return _run_with_internal_http_error(
+    result = _run_with_internal_http_error(
         "update_automation_delivery_config",
         lambda: automation_store.update_delivery_config(payload),
     )
+    return redact_secrets(result)
 
 
 @app.get("/api/automation/delivery-routes")
@@ -1717,10 +1807,19 @@ async def run_plan_execution(
 
 
 @app.post("/api/queries/execute")
-async def execute_query(sql: str = Body(..., embed=True), profile: Optional[str] = Body(None, embed=True)):
+async def execute_query(
+    sql: str = Body(..., embed=True),
+    profile: Optional[str] = Body(None, embed=True),
+    _principal=Depends(require_user(session_store, SESSION_COOKIE_NAME)),
+    _csrf: None = Depends(require_csrf(session_store, SESSION_COOKIE_NAME)),
+):
     """Executa una consulta SQL i retorna els resultats en format apte per a taules."""
     async def operation(_selected_profile, dbm):
-        data, cols = dbm.execute_query(sql)
+        try:
+            safe_sql = SQLExecutionPolicy.validate_read_only(sql)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Only read-only SQL is permitted") from exc
+        data, cols = dbm.execute_query(safe_sql)
 
         if data is None:
             raise HTTPException(status_code=400, detail="Error en l'execucio de la consulta")

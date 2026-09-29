@@ -16,7 +16,6 @@ export default function MailConfigView() {
     smtp_host: '',
     smtp_port: 587,
     smtp_username: '',
-    smtp_password: '',
     smtp_use_tls: true,
     from_email: '',
     default_recipients: [],
@@ -26,7 +25,6 @@ export default function MailConfigView() {
     tic_summary_recipients: [],
     tic_summary_recipients_text: '',
     provider_routes: [],
-    teams_webhook: '',
     sharepoint_site: '',
     sharepoint_library: '',
     sharepoint_folder: '',
@@ -49,7 +47,6 @@ export default function MailConfigView() {
         smtp_host: '',
         smtp_port: 587,
         smtp_username: '',
-        smtp_password: '',
         smtp_use_tls: true,
         from_email: '',
         default_recipients: [],
@@ -59,7 +56,6 @@ export default function MailConfigView() {
         tic_summary_recipients: [],
         tic_summary_recipients_text: '',
         provider_routes: [],
-        teams_webhook: '',
         sharepoint_site: '',
         sharepoint_library: '',
         sharepoint_folder: '',
@@ -102,8 +98,9 @@ export default function MailConfigView() {
     setSaving(true);
     setMessage({ type: '', text: '' });
     try {
+      const { smtp_password: _smtpPassword, teams_webhook: _teamsWebhook, ...safeConfig } = config;
       const deliveryConfigPayload = {
-        ...config,
+        ...safeConfig,
         smtp_port: Number(config.smtp_port),
         history_retention_days: Number(config.history_retention_days || 30),
         retry_retention_days: Number(config.retry_retention_days || 30),
@@ -275,16 +272,7 @@ export default function MailConfigView() {
                 placeholder="usuari@exemple.com" 
               />
             </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold text-muted-foreground uppercase ml-1">Contrasenya</label>
-              <input 
-                type="password"
-                value={config.smtp_password} 
-                onChange={e => setConfig({...config, smtp_password: e.target.value})}
-                className="rounded-xl border border-border bg-white/5 p-3 text-sm outline-none focus:ring-1 focus:ring-primary transition-all" 
-                placeholder="••••••••" 
-              />
-            </div>
+            <p className="col-span-full text-xs text-muted-foreground">La contrasenya SMTP es configura només al servidor mitjançant <code>SMTP_PASSWORD</code>; mai no es desa ni s&apos;envia des del navegador.</p>
             <div className="flex flex-col gap-2">
               <label className="text-xs font-bold text-muted-foreground uppercase ml-1">Correu Remitent</label>
               <input 

@@ -47,6 +47,7 @@ from src.core.sql_result_comparator import compare_query_results, default_compar
 from src.core.sqlite_paths import resolve_sqlite_path
 from src.core.time_utils import utc_now, utc_now_iso
 from src.api.post_crq_audit import _days_back_from_filter, _run_single_post_crq_check, parse_post_crq_checks
+from src.api.security import SQLExecutionPolicy
 from src.core.sql_codex_transformer import transform_for_codex
 
 logger = logging.getLogger(__name__)
@@ -730,15 +731,13 @@ def _extract_ampersand_variables(sql_text: str) -> List[str]:
 
 
 def _ensure_select_query(sql_text: str) -> None:
-    stripped = re.sub(r"/\*.*?\*/", " ", sql_text or "", flags=re.DOTALL)
-    stripped = re.sub(r"--.*?$", " ", stripped, flags=re.MULTILINE).strip()
-    first_match = re.match(r"([A-Za-z]+)", stripped or "")
-    first_token = first_match.group(1).upper() if first_match else ""
-    if first_token not in {"SELECT", "WITH"}:
+    try:
+        SQLExecutionPolicy.validate_read_only(sql_text)
+    except ValueError as exc:
         raise HTTPException(
             status_code=400,
             detail="Només es permeten consultes SELECT/WITH al motor de comparació.",
-        )
+        ) from exc
 
 
 def _unique_column_names(columns: List[str]) -> List[str]:

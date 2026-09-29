@@ -57,6 +57,7 @@ vi.mock('../api/automation.js', () => ({
     last_auto_purge_at: '2026-03-21T01:00:00Z',
   })),
   listAutomationChangeEvents: vi.fn(() => Promise.resolve({ items: [] })),
+  listDeliveryAttempts: vi.fn(() => Promise.resolve({ items: [] })),
   listAutomationJobs: vi.fn(() => Promise.resolve({ items: [] })),
   listAutomationRuns: vi.fn(() => Promise.resolve({ items: [] })),
   listMasterLotBackfillRuns: vi.fn(() => Promise.resolve({ items: [] })),
@@ -363,16 +364,10 @@ test('AutomationView lets you inspect run history and manage retries', async () 
   const historySection = document.getElementById('history');
   expect(await within(historySection).findByText((content, node) => node?.tagName === 'TD' && content === 'LOT_APP')).toBeInTheDocument();
   expect(listAutomationRunLotsFiltered).toHaveBeenCalledWith(77, expect.any(Object));
-
-  fireEvent.click(screen.getByRole('button', { name: /Envia a reintents/i }));
-  await waitFor(() => {
-    expect(enqueueRetry).toHaveBeenCalledWith({
-      run_id: 77,
-      lot: 'LOT_APP',
-      audience: 'provider',
-      requested_by: 'automation_ui',
-    });
-  });
+  // The UI is fail-closed: a lot result alone is not enough to re-send mail.
+  // A delivery attempt is required to prove a retry is safe.
+  expect(screen.queryByRole('button', { name: /Envia a reintents/i })).not.toBeInTheDocument();
+  expect(enqueueRetry).not.toHaveBeenCalled();
 
   await clickScreenButton('Reintents');
   fireEvent.click(await screen.findByRole('button', { name: /^Executa$/i }));

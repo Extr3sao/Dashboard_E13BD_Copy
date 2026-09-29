@@ -3,7 +3,6 @@ import json
 import logging
 import os
 import sqlite3
-import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -36,7 +35,6 @@ def _json_loads(value: Optional[str], default: Any) -> Any:
 class AutomationStore:
     def __init__(self, db_path: Optional[str] = None):
         self.db_path = db_path or resolve_sqlite_path("AUTOMATION_DB_PATH", "automation.db")
-        self._memory_fallback_conn: Optional[sqlite3.Connection] = None
         self._ensure_dir()
         try:
             self._init_db()
@@ -67,11 +65,7 @@ class AutomationStore:
                     retry_message = str(retry_exc).lower()
                     if not any(token in retry_message for token in ("disk i/o error", "readonly", "attempt to write a readonly database")):
                         raise
-            memory_name = re.sub(r"[^a-zA-Z0-9_]+", "_", Path(str(self.db_path)).stem or "automation")
-            self.db_path = f"file:oracle_audit_{memory_name}?mode=memory&cache=shared"
-            self._memory_fallback_conn = sqlite3.connect(self.db_path, uri=True, check_same_thread=False)
-            self._memory_fallback_conn.row_factory = sqlite3.Row
-            self._init_db()
+            raise RuntimeError(f"Automation SQLite storage is unavailable: {self.db_path}") from exc
 
     def _ensure_dir(self) -> None:
         db_dir = os.path.dirname(self.db_path)
@@ -91,6 +85,9 @@ class AutomationStore:
             conn = sqlite3.connect(self.db_path, check_same_thread=False)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute("PRAGMA busy_timeout = 5000")
+        # WAL allows readers to proceed while durable automation state is written.
+        conn.execute("PRAGMA journal_mode = WAL")
         return conn
 
     def _ensure_column(self, conn: sqlite3.Connection, table: str, column: str, ddl: str) -> None:
@@ -245,6 +242,10 @@ class AutomationStore:
                 )
                 """
             )
+            # Credentials and webhook URLs are deployment secrets.  Older local
+            # installations may contain them; remove them during initialization
+            # rather than retaining plaintext operational secrets in SQLite.
+            cursor.execute("UPDATE delivery_config SET smtp_password = NULL, teams_webhook = NULL")
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS master_lots (
@@ -859,6 +860,22 @@ class AutomationStore:
             )
             conn.commit()
             return int(cursor.lastrowid)
+
+    def recover_stale_runs(self, *, stale_before: str) -> List[int]:
+        """Mark abandoned durable runs explicitly before a scheduler restart."""
+        with self._get_connection() as conn:
+            rows = conn.execute(
+                "SELECT id FROM job_runs WHERE status = 'running' AND started_at < ?",
+                (stale_before,),
+            ).fetchall()
+            ids = [int(row["id"]) for row in rows]
+            if ids:
+                conn.execute(
+                    "UPDATE job_runs SET status = 'interrupted', finished_at = ?, error_message = ? WHERE status = 'running' AND started_at < ?",
+                    (_utc_now_iso(), "stale_run_recovered", stale_before),
+                )
+            conn.commit()
+        return ids
 
     def complete_run(
         self,
@@ -1633,12 +1650,12 @@ class AutomationStore:
                     "smtp_host": "",
                     "smtp_port": 587,
                     "smtp_username": "",
-                    "smtp_password": "",
+                    "smtp_password_configured": False,
                     "smtp_use_tls": True,
                     "from_email": "",
                     "default_recipients": [],
                     "failure_notification_recipients": [],
-                    "teams_webhook": "",
+                    "teams_webhook_configured": False,
                     "sharepoint_site": "",
                     "sharepoint_library": "",
                     "sharepoint_folder": "",
@@ -1651,12 +1668,12 @@ class AutomationStore:
                 "smtp_host": row["smtp_host"] or "",
                 "smtp_port": int(row["smtp_port"] or 587),
                 "smtp_username": row["smtp_username"] or "",
-                "smtp_password": row["smtp_password"] or "",
+                "smtp_password_configured": False,
                 "smtp_use_tls": bool(row["smtp_use_tls"]),
                 "from_email": row["from_email"] or "",
                 "default_recipients": _json_loads(row["default_recipients_json"], []),
                 "failure_notification_recipients": _json_loads(row["failure_notification_recipients_json"], []),
-                "teams_webhook": row["teams_webhook"] or "",
+                "teams_webhook_configured": False,
                 "sharepoint_site": row["sharepoint_site"] or "",
                 "sharepoint_library": row["sharepoint_library"] or "",
                 "sharepoint_folder": row["sharepoint_folder"] or "",
@@ -1684,12 +1701,12 @@ class AutomationStore:
                     merged.get("smtp_host", ""),
                     int(merged.get("smtp_port") or 587),
                     merged.get("smtp_username", ""),
-                    merged.get("smtp_password", ""),
+                    None,
                     int(bool(merged.get("smtp_use_tls", True))),
                     merged.get("from_email", ""),
                     _json_dumps(merged.get("default_recipients"), []),
                     _json_dumps(merged.get("failure_notification_recipients"), []),
-                    merged.get("teams_webhook", ""),
+                    None,
                     merged.get("sharepoint_site", ""),
                     merged.get("sharepoint_library", ""),
                     merged.get("sharepoint_folder", ""),
@@ -2559,6 +2576,25 @@ class AutomationStore:
                     claimed_ids.append(int(row["id"]))
             conn.commit()
         return [self.list_retry_queue(queue_id=item_id)[0] for item_id in claimed_ids]
+
+    def claim_manual_retry_queue_item(self, queue_id: int, *, lock_token: str, now_iso: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Atomically claim one pending manual retry; losers must not send."""
+        now_value = str(now_iso or _utc_now_iso())
+        with self._get_connection() as conn:
+            updated = conn.execute(
+                """
+                UPDATE delivery_retry_queue
+                SET status = 'in_progress', lock_token = ?, locked_at = ?, updated_at = ?
+                WHERE id = ? AND status = 'pending' AND retry_mode = 'manual'
+                """,
+                (lock_token, now_value, now_value, int(queue_id)),
+            )
+            if not updated.rowcount:
+                conn.commit()
+                return None
+            row = conn.execute("SELECT * FROM delivery_retry_queue WHERE id = ?", (int(queue_id),)).fetchone()
+            conn.commit()
+        return self.list_retry_queue(queue_id=int(row["id"]))[0] if row else None
 
     def update_retry_queue_item(self, queue_id: int, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         current_items = self.list_retry_queue(queue_id=queue_id)

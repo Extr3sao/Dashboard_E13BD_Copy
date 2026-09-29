@@ -28,6 +28,7 @@ export default function AutomationView({ profiles, onOpenPostCrqRun }) {
     backfillPreview,
     backfillSelection,
     changeEvents,
+    deliveryAttemptsByRunId,
     checks,
     currentScreen,
     deliveryAudienceLabel,
@@ -182,6 +183,8 @@ export default function AutomationView({ profiles, onOpenPostCrqRun }) {
                 analyticsLots={analyticsLots}
                 analyticsSchemas={analyticsSchemas}
                 analyticsChecks={analyticsChecks}
+                runs={runs}
+                retryQueue={retryQueue}
               />
             ) : null}
 
@@ -287,6 +290,7 @@ export default function AutomationView({ profiles, onOpenPostCrqRun }) {
             handleExportRunCsv={handleExportRunCsv}
             loadingRunLotsId={loadingRunLotsId}
             runLotsById={runLotsById}
+            deliveryAttemptsByRunId={deliveryAttemptsByRunId}
             lotStatusLabel={lotStatusLabel}
             lotStatusClass={lotStatusClass}
             runStatusLabel={runStatusLabel}

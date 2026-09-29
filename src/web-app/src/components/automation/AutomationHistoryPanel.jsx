@@ -1,6 +1,7 @@
 import React from 'react';
 import { ChevronDown, ChevronUp, Download, Filter, RefreshCcw, Trash2 } from 'lucide-react';
 import { DELIVERY_AUDIENCES, DELIVERY_RESULTS, LOT_STATES } from '../../config/automationViewConfig.js';
+import { retryEligibility } from '../../utils/automationViewUtils.js';
 import { SectionToggleButton } from './AutomationSection.jsx';
 
 function formatTimestamp(value) {
@@ -35,6 +36,7 @@ export default function AutomationHistoryPanel({
   handleExportRunCsv,
   loadingRunLotsId,
   runLotsById,
+  deliveryAttemptsByRunId,
   lotStatusLabel,
   lotStatusClass,
   runStatusLabel,
@@ -241,7 +243,10 @@ export default function AutomationHistoryPanel({
                                       </tr>
                                     </thead>
                                     <tbody>
-                                      {(runLotsById[run.id] || []).map((item, index) => (
+                                      {(runLotsById[run.id] || []).map((item, index) => {
+                                        const attempt = (deliveryAttemptsByRunId?.[run.id] || []).find((candidate) => candidate.lot === item.lot && candidate.audience === item.delivery_audience);
+                                        const retry = retryEligibility(attempt?.status);
+                                        return (
                                         <tr key={`${run.id}-${item.lot || 'item'}-${index}`} className="border-t border-white/10">
                                           <td className="px-3 py-3 text-foreground">{item.lot || '-'}</td>
                                           <td className="px-3 py-3"><span className={`rounded-full border px-2 py-1 text-[11px] font-semibold uppercase tracking-wide ${lotStatusClass(item.detection_status)}`}>{lotStatusLabel(item.detection_status)}</span></td>
@@ -252,14 +257,15 @@ export default function AutomationHistoryPanel({
                                           <td className="px-3 py-3 text-foreground">{yesNo(item.email_sent)}</td>
                                           <td className="px-3 py-3 text-muted-foreground">{item.observaciones || item.motivo_sin_envio || '-'}</td>
                                           <td className="px-3 py-3">
-                                            {!item.email_sent ? (
+                                            <p className="mb-2 text-xs text-muted-foreground">{retry.reason}</p>
+                                            {retry.eligible ? (
                                               <button type="button" onClick={() => handleEnqueueRetry(run.id, item.lot, item.lot === 'TIC' ? 'tic' : 'provider')} className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-amber-100 transition hover:bg-amber-500/20">
                                                 Envia a reintents
                                               </button>
-                                            ) : <span className="text-xs text-muted-foreground">-</span>}
+                                            ) : <span className="text-xs font-semibold text-muted-foreground">Bloquejat</span>}
                                           </td>
                                         </tr>
-                                      ))}
+                                      ); })}
                                     </tbody>
                                   </table>
                                 </div>

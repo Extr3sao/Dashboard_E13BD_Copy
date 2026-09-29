@@ -1,6 +1,5 @@
 import sqlite3
 import os
-import re
 from pathlib import Path
 from typing import Iterable, Optional, List, Dict, Any, Tuple
 
@@ -10,25 +9,13 @@ from src.core.ownership_resolver import detect_ownership_table
 class InternalDBManager:
     def __init__(self, db_path=None):
         self.db_path = db_path or resolve_sqlite_path("INTERNAL_DB_PATH", "internal.db")
-        self._memory_fallback_conn = None
         self._ensure_dir()
         try:
             self._init_db()
         except sqlite3.OperationalError as exc:
-            message = str(exc).lower()
-            if "disk i/o error" not in message:
-                raise
-            fallback_filename = Path(str(self.db_path)).name or "internal.db"
-            fallback_disk_path = resolve_sqlite_path("INTERNAL_DB_PATH", fallback_filename)
-            if fallback_disk_path != self.db_path:
-                self.db_path = fallback_disk_path
-                self._ensure_dir()
-                self._init_db()
-                return
-            memory_name = re.sub(r"[^a-zA-Z0-9_]+", "_", Path(str(self.db_path)).stem or "internal")
-            self.db_path = f"file:oracle_audit_{memory_name}?mode=memory&cache=shared"
-            self._memory_fallback_conn = sqlite3.connect(self.db_path, uri=True, check_same_thread=False)
-            self._init_db()
+            # Operational data must never silently become ephemeral after a disk
+            # failure: callers need a visible, actionable failure instead.
+            raise RuntimeError(f"Internal SQLite storage is unavailable: {self.db_path}") from exc
 
     def _ensure_dir(self):
         # If db_path is just a filename, dirname can be empty.
@@ -48,6 +35,8 @@ class InternalDBManager:
         else:
             conn = sqlite3.connect(self.db_path)
         conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute("PRAGMA busy_timeout = 5000")
+        conn.execute("PRAGMA journal_mode = WAL")
         return conn
 
     def _init_db(self):

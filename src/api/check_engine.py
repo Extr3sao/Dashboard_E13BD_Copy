@@ -54,8 +54,8 @@ class RuleResult:
         return payload
 
 
-_SECRET_KEY = re.compile(r"(password|passwd|secret|token|credential|authorization)", re.I)
-_SECRET_VALUE = re.compile(r"(?i)(password|token|secret)\s*[:=]\s*[^\s,;]+")
+_SECRET_KEY = re.compile(r"(password|passwd|secret|token|credential|authorization|api[_-]?key|webhook)", re.I)
+_SECRET_VALUE = re.compile(r"(?i)(password|passwd|token|secret|credential|authorization|api[_-]?key|webhook)\s*[:=]\s*[^\s,;]+")
 
 def redact_evidence(value: Any) -> Any:
     if isinstance(value, dict): return {str(k): ("[REDACTED]" if _SECRET_KEY.search(str(k)) else redact_evidence(v)) for k, v in value.items()}
@@ -75,8 +75,14 @@ class RuleEngine:
             if reason:
                 results.append(self._result(rule, database_id, RuleStatus.SKIPPED, started, summary=reason)); continue
             try:
-                with ThreadPoolExecutor(max_workers=1) as pool:
-                    outcome = pool.submit(executor, rule).result(timeout=rule.timeout)
+                pool = ThreadPoolExecutor(max_workers=1)
+                future = pool.submit(executor, rule)
+                try:
+                    outcome = future.result(timeout=rule.timeout)
+                finally:
+                    # Never wait for an uncooperative timed-out rule: its result is
+                    # isolated and subsequent rules must continue.
+                    pool.shutdown(wait=False, cancel_futures=True)
                 results.append(self._coerce(rule, database_id, started, outcome))
             except TimeoutError:
                 results.append(self._result(rule, database_id, RuleStatus.ERROR, started, error="rule_timeout"))

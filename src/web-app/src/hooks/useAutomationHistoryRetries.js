@@ -3,6 +3,7 @@ import {
   enqueueRetry,
   exportAutomationRunLotsCsv,
   getAutomationMaintenanceSummary,
+  listDeliveryAttempts,
   listAutomationRunLotsFiltered,
   purgeAutomationHistory,
   purgeAutomationRetryQueue,
@@ -16,6 +17,7 @@ export function useAutomationHistoryRetries({ setError, setMessage }) {
   const [maintenanceSummary, setMaintenanceSummary] = useState(null);
   const [retentionDays, setRetentionDays] = useState(30);
   const [runLotsById, setRunLotsById] = useState({});
+  const [deliveryAttemptsByRunId, setDeliveryAttemptsByRunId] = useState({});
   const [expandedRunId, setExpandedRunId] = useState(null);
   const [loadingRunLotsId, setLoadingRunLotsId] = useState(null);
   const [runLotFilter, setRunLotFilter] = useState({ status: '', audience: '', delivery_result: '', search: '' });
@@ -55,6 +57,8 @@ export function useAutomationHistoryRetries({ setError, setMessage }) {
         search: nextFilter.search || undefined,
       });
       setRunLotsById((current) => ({ ...current, [runId]: response.items || [] }));
+      const attemptsResponse = await listDeliveryAttempts({ run_id: runId, limit: 200 });
+      setDeliveryAttemptsByRunId((current) => ({ ...current, [runId]: attemptsResponse.items || [] }));
       clearRunCsvCache();
     } catch (err) {
       setError(err?.response?.data?.detail || err.message || "No s'ha pogut carregar el detall per lots");
@@ -136,6 +140,7 @@ export function useAutomationHistoryRetries({ setError, setMessage }) {
       const result = await purgeAutomationHistory({ retain_days: retentionDays, delete_reports: true });
       setExpandedRunId(null);
       setRunLotsById({});
+      setDeliveryAttemptsByRunId({});
       clearRunCsvCache();
       setMessage(`Hist\u00f2ric netejat. Runs eliminats: ${result.deleted_runs || 0}. Fitxers eliminats: ${result.deleted_report_files || 0}.`);
       await onRefresh();
@@ -158,6 +163,7 @@ export function useAutomationHistoryRetries({ setError, setMessage }) {
 
   return {
     changeEvents,
+    deliveryAttemptsByRunId,
     expandedRunId,
     handleEnqueueRetry,
     handleExportRunCsv,

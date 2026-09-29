@@ -11,9 +11,33 @@ export default function AutomationDashboardPanel({
   analyticsLots,
   analyticsSchemas,
   analyticsChecks,
+  runs = [],
+  retryQueue = [],
 }) {
+  const running = runs.filter((run) => run.status === 'running').length;
+  const failed = runs.filter((run) => ['error', 'partial_error'].includes(run.status)).length;
+  const retryPending = retryQueue.filter((item) => ['pending', 'failed'].includes(item.status)).length;
+  const recentErrors = retryQueue.filter((item) => item.last_error || item.error_message).length;
   return (
     <div className="grid gap-6">
+      <section className="glass-card p-6" aria-labelledby="operational-overview-title">
+        <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-white/10 pb-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Ara mateix</p>
+            <h4 id="operational-overview-title" className="mt-2 text-xl font-extrabold text-foreground">Seguiment operatiu</h4>
+          </div>
+          <p className="text-sm text-muted-foreground">Basat en les últimes execucions i la cua de reintents carregades.</p>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[['En execució', running, 'Revisa durades anòmales'], ['Error o parcial', failed, 'Requereix diagnòstic'], ['Reintents pendents', retryPending, 'Acció disponible si és segura'], ['Errors recents', recentErrors, 'Consulta la cua de reintents']].map(([label, value, help]) => (
+            <div key={label} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{label}</p>
+              <p className="mt-2 text-3xl font-extrabold text-foreground">{value}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{help}</p>
+            </div>
+          ))}
+        </div>
+      </section>
       <div className="glass-card p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>

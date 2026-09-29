@@ -444,6 +444,15 @@ export function deliveryResultLabel(result) {
   return DELIVERY_RESULT_LABELS[result] || result || '-';
 }
 
+export function retryEligibility(deliveryStatus) {
+  const status = String(deliveryStatus || '').trim().toLowerCase();
+  if (['failed', 'error', 'delivery_error'].includes(status)) return { eligible: true, reason: "Error de lliurament confirmat; el reintent es pot encolar." };
+  if (['sent', 'ok'].includes(status)) return { eligible: false, reason: "Ja enviat; reintent bloquejat per evitar duplicats." };
+  if (status === 'in_progress') return { eligible: false, reason: "Operació activa; espera que finalitzi abans de reintentar." };
+  if (status === 'unknown_delivery_outcome') return { eligible: false, reason: "Resultat extern desconegut; no es reenvia automàticament." };
+  return { eligible: false, reason: "Sense intent de lliurament verificable; reintent bloquejat." };
+}
+
 export function runLotSummary(summary) {
   const lotSummary = summary?.lot_execution;
   if (!lotSummary) return '-';
