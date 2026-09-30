@@ -68,18 +68,22 @@ from src.api.report_builder import (
 from src.core.automation_store import AutomationStore
 from src.api.checks_admin_router import router as checks_admin_router
 from src.api.security import SecretProvider, SessionStore, SQLExecutionPolicy, redact_secrets, require_csrf, require_user
+from src.api.finding_engine import FindingStore
+from src.api.findings_router import create_findings_router
 
 
 SCHEMA_NAME_PATTERN = re.compile(r"^[A-Z][A-Z0-9_$#]*$")
 REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 logger = logging.getLogger(__name__)
 secret_provider = SecretProvider()
+AUTH_REQUIRED = (secret_provider.get("E13DB_AUTH_REQUIRED", "true") or "true").lower() == "true"
 session_store = SessionStore(ttl_seconds=int(secret_provider.get("E13DB_SESSION_TTL_SECONDS", "3600") or "3600"))
 SESSION_COOKIE_NAME = "e13db_session"
 
 # Managers globals
 config_loader = ConfigLoader()
 internal_db = InternalDBManager(resolve_sqlite_path("INTERNAL_DB_PATH", "internal.db"))
+finding_store = FindingStore(internal_db)
 automation_store = AutomationStore(resolve_sqlite_path("AUTOMATION_DB_PATH", "automation.db"))
 scoring_engine = ScoringEngine()
 automation_service = AutomationService(automation_store, config_loader)
@@ -103,6 +107,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="Oracle Audit API", version="4.6", lifespan=lifespan)
 logger.info("Starting Oracle Audit API v4.6 (Query Management Module Active)")
 app.include_router(checks_admin_router)
+app.include_router(create_findings_router(finding_store, session_store, SESSION_COOKIE_NAME))
 
 # Configurar CORS per permetre al frontend de React (Vite) connectar-se
 def _cors_origins() -> list[str]:
@@ -166,14 +171,18 @@ app.add_middleware(RequestObservabilityMiddleware)
 class ApiSecurityMiddleware(BaseHTTPMiddleware):
     """Apply USER cookie and CSRF policy consistently to the browser API."""
     async def dispatch(self, request: Request, call_next):
-        if (secret_provider.get("E13DB_AUTH_REQUIRED", "true") or "true").lower() != "true":
+        # Snapshot policy at application construction. A request must never observe
+        # process-wide environment mutations made by a different test or worker.
+        if not AUTH_REQUIRED:
             return await call_next(request)
         if not request.url.path.startswith("/api/") or request.method == "OPTIONS":
             return await call_next(request)
         principal = session_store.principal(request.cookies.get(SESSION_COOKIE_NAME))
         if principal is None or principal.role != "USER":
+            logger.info("auth_rejected", extra={"auth_reason": "authentication_required", "path": request.url.path, "method": request.method})
             return JSONResponse(status_code=401, content={"detail": "Authentication required"})
         if request.method not in {"GET", "HEAD", "OPTIONS"} and not session_store.validate_csrf(principal.session_id, request.headers.get("x-csrf-token")):
+            logger.info("auth_rejected", extra={"auth_reason": "csrf_validation_failed", "path": request.url.path, "method": request.method})
             return JSONResponse(status_code=403, content={"detail": "Invalid CSRF token"})
         return await call_next(request)
 
@@ -1018,6 +1027,12 @@ async def run_post_crq(payload: Dict = Body(...)):
             criticality_overrides=criticality_overrides,
             scheduler_options=scheduler_options,
         )
+        # Findings are reconciled only after the legacy audit completed and emitted
+        # normalized results; a failed connection never implies a resolution.
+        operational = finding_store.reconcile_post_crq(report, target_context=payload.get("target_context") or {})
+        report["operational_summary"] = operational["findings"]
+        report["red_flags"] = operational["red_flags"]
+        report["audit_run_id"] = operational["audit_run_id"]
         return report
 
     return await _run_with_oracle_profile("run_post_crq", payload.get("profile"), operation)

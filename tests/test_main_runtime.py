@@ -36,6 +36,16 @@ class TestMainRuntime(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(completion_call.kwargs["extra"]["path"], "/healthz")
         self.assertNotIn("password=secret", str(completion_call.kwargs["extra"]))
 
+    def test_auth_policy_is_snapshotted_and_rejections_are_safe_and_structured(self):
+        with patch.object(main, "AUTH_REQUIRED", True), patch.object(main.logger, "info") as log_info:
+            with TestClient(main.app) as client:
+                response = client.get("/api/profiles?token=secret", headers={"Authorization": "Bearer secret"})
+
+        self.assertEqual(response.status_code, 401)
+        rejection = next(call for call in log_info.call_args_list if call.args[0] == "auth_rejected")
+        self.assertEqual(rejection.kwargs["extra"]["auth_reason"], "authentication_required")
+        self.assertNotIn("secret", str(rejection.kwargs["extra"]))
+
     def test_request_observability_covers_4xx_and_unhandled_5xx_without_leaking_secrets(self):
         with patch.object(main.logger, "info") as log_info:
             with patch.object(main.config_loader, "load_connections", side_effect=RuntimeError("token=secret")):
