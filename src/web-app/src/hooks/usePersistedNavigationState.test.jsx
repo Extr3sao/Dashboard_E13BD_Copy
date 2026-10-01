@@ -31,3 +31,11 @@ test('usePersistedNavigationState persists profile and subtab changes', () => {
   expect(localStorage.getItem('databaseAuditSubtab')).toBe('Guia i Ajuda');
   expect(localStorage.getItem('activeTab')).toBe('Auditoria BBDD');
 });
+
+test('Operations is a valid persisted top-level destination', () => {
+  localStorage.setItem('activeTab', 'Operations');
+  const { result } = renderHook(() => usePersistedNavigationState());
+  expect(result.current.activeTab).toBe('Operations');
+  act(() => result.current.setActiveTab('Auditoria BBDD'));
+  expect(localStorage.getItem('activeTab')).toBe('Auditoria BBDD');
+});

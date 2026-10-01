@@ -74,6 +74,7 @@ export default function AppShellChrome({
       </header>
 
       <nav className="top-nav" aria-label="Navegació principal">
+        <SidebarItem icon={Settings} label="Operations" active={activeTab === 'Operations'} onClick={() => onSelectMainTab('Operations')} />
         <SidebarItem
           icon={ShieldAlert}
           label="Auditoria BBDD"

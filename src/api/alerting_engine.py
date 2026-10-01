@@ -50,6 +50,8 @@ class AlertingService:
             CREATE TABLE IF NOT EXISTS operational_reports (id INTEGER PRIMARY KEY AUTOINCREMENT, report_type TEXT NOT NULL, period_start REAL NOT NULL, period_end REAL NOT NULL, generated_at REAL NOT NULL, status TEXT NOT NULL, payload TEXT NOT NULL, markdown TEXT NOT NULL, html TEXT NOT NULL, delivery_status TEXT, UNIQUE(report_type, period_start, period_end));
             CREATE INDEX IF NOT EXISTS idx_operational_reports_history ON operational_reports(report_type, generated_at DESC);
             """)
+            if "delivered_at" not in {row[1] for row in conn.execute("PRAGMA table_info(operational_reports)")}:
+                conn.execute("ALTER TABLE operational_reports ADD COLUMN delivered_at REAL")
 
     @staticmethod
     def _rows(conn, sql, args=()):
@@ -145,13 +147,21 @@ class AlertingService:
             rows=self._rows(conn,"SELECT status,attempted_at FROM alert_deliveries ORDER BY attempted_at DESC LIMIT 3")
         failures=sum(r["status"]=="FAILED" for r in rows); return {"status":"DEGRADED" if failures >= 3 else "HEALTHY", "consecutive_failures":failures, "last_delivery":rows[0] if rows else None}
     def generate_report(self, report_type="daily", now=None):
-        now=time.time() if now is None else now; seconds=86400 if report_type=="daily" else 604800; start=now-seconds
+        if report_type not in {"daily", "weekly"}: raise ValueError("Unknown report type")
+        now=time.time() if now is None else now; seconds=86400 if report_type=="daily" else 604800; end=(now // seconds) * seconds; start=end-seconds
+        with self._connect() as conn:
+            cursor = conn.execute("SELECT * FROM operational_reports WHERE report_type=? AND period_start=? AND period_end=?", (report_type,start,end))
+            existing = self._record(cursor, cursor.fetchone())
+        if existing:
+            existing["payload"] = json.loads(existing["payload"])
+            return existing
         audits=self.findings._rows("SELECT * FROM audit_runs WHERE completed_at>=?",(start,)); findings=self.findings.list_findings(resolved=None); fleet=self.findings.fleet(now=now); aging=[f for f in findings if f["severity"]=="CRITICAL" and now-f["first_seen"] >= seconds]
-        payload={"type":report_type,"period_start":start,"period_end":now,"fleet":fleet["counts"],"new":sum(f["delta"]=="NEW" for f in findings),"worsening":sum(f["delta"]=="WORSENING" for f in findings),"resolved":sum(f["delta"]=="RESOLVED" for f in findings),"aging_findings":[{"id":f["id"],"database_id":f["database_id"],"summary":redact_secrets(f["summary"]),"days_open":round((now-f["first_seen"])/86400,1),"occurrences":f["occurrences"]} for f in aging],"audit_successful":sum(a["state"]=="SUCCESS" for a in audits),"audit_failed":sum(a["state"]!="SUCCESS" for a in audits),"needs_attention":[redact_secrets(item) for item in fleet["needs_attention"][:10]]}
+        audits = [audit for audit in audits if audit["completed_at"] < end]
+        payload={"type":report_type,"period_start":start,"period_end":end,"fleet":fleet["counts"],"new":sum(f["delta"]=="NEW" for f in findings),"worsening":sum(f["delta"]=="WORSENING" for f in findings),"resolved":sum(f["delta"]=="RESOLVED" for f in findings),"aging_findings":[{"id":f["id"],"database_id":f["database_id"],"summary":redact_secrets(f["summary"]),"days_open":round((now-f["first_seen"])/86400,1),"occurrences":f["occurrences"]} for f in aging],"audit_successful":sum(a["state"]=="SUCCESS" for a in audits),"audit_failed":sum(a["state"]!="SUCCESS" for a in audits),"needs_attention":[redact_secrets(item) for item in fleet["needs_attention"][:10]]}
         lines=[f"# E13DB {report_type.upper()} REPORT", "", "## Needs Attention"]+[f"- {x['priority']} {x['database_id']}: {x.get('explanation','') }" for x in payload['needs_attention']] + ["", "## Fleet", json.dumps(payload["fleet"]), "", f"New: {payload['new']} | Worsening: {payload['worsening']} | Resolved: {payload['resolved']}"]
         markdown="\n".join(lines); html="<h1>E13DB %s Report</h1><h2>Needs Attention</h2><ul>%s</ul><h2>Fleet</h2><pre>%s</pre>" % (report_type.title(), "".join(f"<li>{x['priority']} {x['database_id']}: {x.get('explanation','')}</li>" for x in payload['needs_attention']), json.dumps(payload['fleet']))
         with self._connect() as conn:
-            conn.execute("INSERT OR REPLACE INTO operational_reports(report_type,period_start,period_end,generated_at,status,payload,markdown,html) VALUES(?,?,?,?,?,?,?,?)",(report_type,start,now,now,"GENERATED",json.dumps(payload),markdown,html)); cursor=conn.execute("SELECT * FROM operational_reports WHERE report_type=? AND period_start=? AND period_end=?",(report_type,start,now)); row=self._record(cursor,cursor.fetchone())
+            conn.execute("INSERT OR IGNORE INTO operational_reports(report_type,period_start,period_end,generated_at,status,payload,markdown,html) VALUES(?,?,?,?,?,?,?,?)",(report_type,start,end,now,"GENERATED",json.dumps(payload),markdown,html)); cursor=conn.execute("SELECT * FROM operational_reports WHERE report_type=? AND period_start=? AND period_end=?",(report_type,start,end)); row=self._record(cursor,cursor.fetchone())
         row["payload"] = json.loads(row["payload"])
         return row
     def list_reports(self, limit=50):
@@ -161,8 +171,9 @@ class AlertingService:
         now = time.time() if now is None else now; generated = []
         for report_type, interval in (("daily", 86400), ("weekly", 604800)):
             with self._connect() as conn:
-                row = conn.execute("SELECT MAX(generated_at) FROM operational_reports WHERE report_type=?", (report_type,)).fetchone()
-            if not row[0] or now - row[0] >= interval:
+                end = (now // interval) * interval
+                row = conn.execute("SELECT 1 FROM operational_reports WHERE report_type=? AND period_start=? AND period_end=?", (report_type,end-interval,end)).fetchone()
+            if not row:
                 generated.append(self.generate_report(report_type, now))
         return generated
     def report(self, report_id):
@@ -183,5 +194,5 @@ class AlertingService:
         except Exception as exc:
             status = "FAILED: " + str(redact_secrets(str(exc)))[:200]
         with self._connect() as conn:
-            conn.execute("UPDATE operational_reports SET delivery_status=? WHERE id=?", (status, report_id))
+            conn.execute("UPDATE operational_reports SET delivery_status=?,delivered_at=? WHERE id=?", (status, time.time(), report_id))
         return {"id": report_id, "delivery_status": status}

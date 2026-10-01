@@ -1,0 +1,21 @@
+<service>
+  <id>E13DB</id>
+  <name>E13DB CPD Operations</name>
+  <description>Oracle audit service with durable scheduler and operations health.</description>
+  <executable>%BASE%\..\.venv\Scripts\python.exe</executable>
+  <arguments>-m uvicorn src.api.main:app --host 127.0.0.1 --port 8011 --workers 1 --timeout-graceful-shutdown 25</arguments>
+  <workingdirectory>%BASE%\..</workingdirectory>
+  <startmode>Automatic</startmode>
+  <env name="E13DB_SCHEDULER_ENABLED" value="true" />
+  <env name="E13DB_AUTH_REQUIRED" value="true" />
+  <env name="E13DB_SHUTDOWN_GRACE_SECONDS" value="15" />
+  <stoptimeout>35 sec</stoptimeout>
+  <onfailure action="restart" delay="15 sec" />
+  <onfailure action="restart" delay="60 sec" />
+  <resetfailure>1 hour</resetfailure>
+  <logpath>%BASE%\..\resources\service-logs</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>10</keepFiles>
+  </log>
+</service>

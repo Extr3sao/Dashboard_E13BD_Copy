@@ -39,33 +39,8 @@ class AutomationStore:
         try:
             self._init_db()
         except sqlite3.OperationalError as exc:
-            message = str(exc).lower()
-            if not any(token in message for token in ("disk i/o error", "readonly", "attempt to write a readonly database")):
-                raise
-            fallback_filename = Path(str(self.db_path)).name or "automation.db"
-            fallback_disk_path = resolve_sqlite_path("AUTOMATION_DB_PATH", fallback_filename)
-            if fallback_disk_path != self.db_path:
-                self.db_path = fallback_disk_path
-                self._ensure_dir()
-                try:
-                    self._init_db()
-                    return
-                except sqlite3.OperationalError as retry_exc:
-                    retry_message = str(retry_exc).lower()
-                    if not any(token in retry_message for token in ("disk i/o error", "readonly", "attempt to write a readonly database")):
-                        raise
-            fallback_disk_path = self._build_fallback_path()
-            if fallback_disk_path != self.db_path:
-                self.db_path = fallback_disk_path
-                self._ensure_dir()
-                try:
-                    self._init_db()
-                    return
-                except sqlite3.OperationalError as retry_exc:
-                    retry_message = str(retry_exc).lower()
-                    if not any(token in retry_message for token in ("disk i/o error", "readonly", "attempt to write a readonly database")):
-                        raise
-            raise RuntimeError(f"Automation SQLite storage is unavailable: {self.db_path}") from exc
+            # Fail closed: a second database would silently lose scheduler history.
+            raise RuntimeError("Automation SQLite storage is unavailable") from exc
 
     def _ensure_dir(self) -> None:
         db_dir = os.path.dirname(self.db_path)
@@ -88,6 +63,7 @@ class AutomationStore:
         conn.execute("PRAGMA busy_timeout = 5000")
         # WAL allows readers to proceed while durable automation state is written.
         conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA synchronous = FULL")
         return conn
 
     def _ensure_column(self, conn: sqlite3.Connection, table: str, column: str, ddl: str) -> None:
@@ -897,7 +873,7 @@ class AutomationStore:
                 UPDATE job_runs
                 SET finished_at = ?, status = ?, duration_ms = ?, summary_json = ?, error_message = ?,
                     report_path = ?, deliveries_json = ?, created_tasks_json = ?
-                WHERE id = ?
+                WHERE id = ? AND status = 'running'
                 """,
                 (
                     finished_at,

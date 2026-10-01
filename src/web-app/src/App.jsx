@@ -22,6 +22,7 @@ import usePostCrqAudit from './hooks/usePostCrqAudit.js';
 import useProfiles from './hooks/useProfiles.js';
 const DatabaseAuditWorkspace = lazy(() => import('./views/DatabaseAuditWorkspace.jsx'));
 const SystemArchitectureView = lazy(() => import('./views/SystemArchitectureView.jsx'));
+const OperationsView = lazy(() => import('./views/OperationsView.jsx'));
 
 
 function App() {
@@ -108,8 +109,8 @@ function App() {
     activeTab === 'Auditoria BBDD'
       && DATABASE_AUDIT_SUBTABS_HIDE_PROFILE_SELECTOR.includes(databaseAuditSubtab)
   );
-  const showHeaderProfileSelector = !hideEmbeddedProfileSelector;
-  const showGlobalReportControls = !(
+   const showHeaderProfileSelector = !hideEmbeddedProfileSelector && activeTab !== 'Operations';
+   const showGlobalReportControls = activeTab !== 'Operations' && !(
     activeTab === 'Auditoria BBDD'
       && DATABASE_AUDIT_SUBTABS_HIDE_GLOBAL_REPORT.includes(databaseAuditSubtab)
   );
@@ -160,7 +161,8 @@ function App() {
             }`}
           >
             <Suspense fallback={<div className="glass-card p-6 text-sm text-muted-foreground">Carregant vista...</div>}>
-              <AppPageHeader
+              {activeTab === 'Operations' && <OperationsView />}
+              {activeTab !== 'Operations' && <AppPageHeader
                 activeTab={activeTab}
                 subtabLabel={activeTab === 'Auditoria BBDD' ? databaseAuditSubtab : null}
                 helpKey={currentPageHelpKey}
@@ -168,7 +170,7 @@ function App() {
                 loading={loading}
                 onRefresh={() => window.location.reload()}
                 onGenerateReport={handleGenerateReport}
-              />
+              />}
 
               {activeTab === 'Auditoria BBDD' && (
                 <DatabaseAuditWorkspace

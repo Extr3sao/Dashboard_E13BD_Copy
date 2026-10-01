@@ -31,7 +31,7 @@ vi.mock('./views/DatabaseAuditWorkspace.jsx', () => ({
 
         {databaseAuditSubtab === 'AnÃ lisi obsolets' && (
           <section>
-            <h3>Anàlisi 360</h3>
+            <h3>Anï¿½lisi 360</h3>
             <button type="button">Auditar</button>
           </section>
         )}
@@ -58,11 +58,11 @@ vi.mock('./views/DatabaseAuditWorkspace.jsx', () => ({
               </select>
             </label>
             <button type="button" onClick={() => setPostCrqConfigOpen((value) => !value)}>
-              Obrir configuració
+              Obrir configuraciï¿½
             </button>
-            {postCrqConfigOpen && <div>Submenú de configuració</div>}
+            {postCrqConfigOpen && <div>Submenï¿½ de configuraciï¿½</div>}
             <button type="button" onClick={() => setPostCrqPlannerOpen((value) => !value)}>
-              Planificador d'execució
+              Planificador d'execuciï¿½
             </button>
             {postCrqPlannerOpen && (
               <div>
@@ -82,10 +82,10 @@ vi.mock('./views/DatabaseAuditWorkspace.jsx', () => ({
             </button>
             {postCrqExecuted && (
               <div>
-                <div>Paràmetres d'execució</div>
+                <div>Parï¿½metres d'execuciï¿½</div>
                 <div>Resum executiu per lots</div>
                 <div>Lot prioritzat</div>
-                <div>Acció inicial:</div>
+                <div>Acciï¿½ inicial:</div>
                 <div>Checks afectats</div>
               </div>
             )}
@@ -94,8 +94,8 @@ vi.mock('./views/DatabaseAuditWorkspace.jsx', () => ({
 
         {databaseAuditSubtab === 'Automatitzacions' && (
           <section>
-            <div>Programació</div>
-            <div>Jobs d'automatització</div>
+            <div>Programaciï¿½</div>
+            <div>Jobs d'automatitzaciï¿½</div>
             <label>Nom del job<input defaultValue="Job test" /></label>
           </section>
         )}
@@ -209,23 +209,23 @@ vi.mock('axios', () => {
                 {
                   check_id: 'CHECK_01',
                   title: 'TAULES RECENTS SENSE PRIMARY KEY',
-                  severitat: 'Mitjà',
-                  criticitat: 'Mitjà',
-                  criteri: 'Només taules modificades recentment',
+                  severitat: 'Mitjï¿½',
+                  criticitat: 'Mitjï¿½',
+                  criteri: 'Nomï¿½s taules modificades recentment',
                 },
                 {
                   check_id: 'CHECK_03',
-                  title: 'SEQÜÈNCIES RECENTS SENSE CACHE O AMB CACHE INSUFICIENT',
-                  severitat: 'Crític',
-                  criticitat: 'Crític',
-                  criteri: 'Només seqüències modificades recentment',
+                  title: 'SEQï¿½ï¿½NCIES RECENTS SENSE CACHE O AMB CACHE INSUFICIENT',
+                  severitat: 'Crï¿½tic',
+                  criticitat: 'Crï¿½tic',
+                  criteri: 'Nomï¿½s seqï¿½ï¿½ncies modificades recentment',
                 },
                 {
                   check_id: 'CHECK_04',
-                  title: 'FOREIGN KEYS RECENTS SENSE ÍNDEX DE SUPORT',
-                  severitat: 'Crític',
-                  criticitat: 'Crític',
-                  criteri: 'Només foreign keys modificades recentment',
+                  title: 'FOREIGN KEYS RECENTS SENSE ï¿½NDEX DE SUPORT',
+                  severitat: 'Crï¿½tic',
+                  criticitat: 'Crï¿½tic',
+                  criteri: 'Nomï¿½s foreign keys modificades recentment',
                 },
               ],
             },
@@ -276,11 +276,11 @@ vi.mock('axios', () => {
                 checks_with_findings: 1,
                 total_findings: 1,
                 checks_with_errors: 0,
-                findings_by_criticality: { 'Crític': 0, 'Mitjà': 1, 'Baix': 0 },
+                findings_by_criticality: { 'Crï¿½tic': 0, 'Mitjï¿½': 1, 'Baix': 0 },
                 criticality_sections: [
-                  { criticality_key: 'CRITIC', criticality_label: 'Crític', action_text: "Aquestes incidències s'han de solucionar de manera urgent.", items: [] },
-                  { criticality_key: 'MITJA', criticality_label: 'Mitjà', action_text: "Aquestes incidències s'han de solucionar en un termini màxim de 15 dies.", items: [{ check_id: 'CHECK_01', summary_text: "S'han trobat 1 taula dels esquemes APP_USER sense primary key." }] },
-                  { criticality_key: 'BAIX', criticality_label: 'Baix', action_text: "Aquestes incidències s'han de solucionar en un termini màxim d'1 mes.", items: [] },
+                  { criticality_key: 'CRITIC', criticality_label: 'Crï¿½tic', action_text: "Aquestes incidï¿½ncies s'han de solucionar de manera urgent.", items: [] },
+                  { criticality_key: 'MITJA', criticality_label: 'Mitjï¿½', action_text: "Aquestes incidï¿½ncies s'han de solucionar en un termini mï¿½xim de 15 dies.", items: [{ check_id: 'CHECK_01', summary_text: "S'han trobat 1 taula dels esquemes APP_USER sense primary key." }] },
+                  { criticality_key: 'BAIX', criticality_label: 'Baix', action_text: "Aquestes incidï¿½ncies s'han de solucionar en un termini mï¿½xim d'1 mes.", items: [] },
                 ],
                 detected_time_range: { start_at: '2026-03-08 10:00', end_at: '2026-03-08 10:00' },
                 environment_message: 'Corregir urgentment!!!',
@@ -299,11 +299,11 @@ vi.mock('axios', () => {
                   ],
                 },
                 criticality_blocks: [
-                  { criticality_key: 'CRITIC', criticality_label: 'Crític', action_text: "Aquestes incidències s'han de solucionar de manera urgent.", items: [] },
+                  { criticality_key: 'CRITIC', criticality_label: 'Crï¿½tic', action_text: "Aquestes incidï¿½ncies s'han de solucionar de manera urgent.", items: [] },
                   {
                     criticality_key: 'MITJA',
-                    criticality_label: 'Mitjà',
-                    action_text: "Aquestes incidències s'han de solucionar en un termini màxim de 15 dies.",
+                    criticality_label: 'Mitjï¿½',
+                    action_text: "Aquestes incidï¿½ncies s'han de solucionar en un termini mï¿½xim de 15 dies.",
                     items: [
                       {
                         check_id: 'CHECK_01',
@@ -313,7 +313,7 @@ vi.mock('axios', () => {
                       },
                     ],
                   },
-                  { criticality_key: 'BAIX', criticality_label: 'Baix', action_text: "Aquestes incidències s'han de solucionar en un termini màxim d'1 mes.", items: [] },
+                  { criticality_key: 'BAIX', criticality_label: 'Baix', action_text: "Aquestes incidï¿½ncies s'han de solucionar en un termini mï¿½xim d'1 mes.", items: [] },
                 ],
                 critical_incident_cards: [],
                 quality_gate: { status: 'ok', issues: [], critical_without_lot: 0 },
@@ -332,9 +332,9 @@ vi.mock('axios', () => {
                     check_descriptions: [{ check_id: 'CHECK_01', title: 'TAULES RECENTS SENSE PRIMARY KEY' }],
                     schemas: ['APP_USER'],
                     affected_objects: 1,
-                    first_action: "Crear la PRIMARY KEY o justificar documentalment l'excepció.",
+                    first_action: "Crear la PRIMARY KEY o justificar documentalment l'excepciï¿½.",
                     dominant_impact: "Risc d'integritat i dificultat de manteniment.",
-                    priority: 'Mitjà',
+                    priority: 'Mitjï¿½',
                   },
                 ],
                 lot_incident_groups: [
@@ -343,10 +343,10 @@ vi.mock('axios', () => {
                     check: 'CHECK_01',
                     title: 'TAULES RECENTS SENSE PRIMARY KEY',
                     description: "S'ha detectat una taula sense PRIMARY KEY activa.",
-                    severity: 'Mitjà',
+                    severity: 'Mitjï¿½',
                     termini_dies: 15,
                     impacte: "Complica la integritat i el manteniment del model.",
-                    accio_recomanada: "Crear la PRIMARY KEY o justificar documentalment l'excepció.",
+                    accio_recomanada: "Crear la PRIMARY KEY o justificar documentalment l'excepciï¿½.",
                     validacio_posterior: 'Reexecutar el check i validar la unicitat de les dades.',
                     schemas: [
                       {
@@ -356,7 +356,7 @@ vi.mock('axios', () => {
                           {
                             OBJECTE: 'TMP_EXAMPLE',
                             TIPUS: 'TABLE',
-                            'DADA TÈCNICA': 'Sense PK activa · volum baix',
+                            'DADA Tï¿½CNICA': 'Sense PK activa ï¿½ volum baix',
                           },
                         ],
                       },
@@ -366,7 +366,7 @@ vi.mock('axios', () => {
               final_observations: {
                 blocking_errors: [],
                 warnings: [],
-                next_steps: ["Aplicar la correcció i reexecutar l'auditoria."],
+                next_steps: ["Aplicar la correcciï¿½ i reexecutar l'auditoria."],
               },
               },
               report_options: { include_annex: true },
@@ -374,8 +374,8 @@ vi.mock('axios', () => {
                 {
                   check_id: 'CHECK_01',
                   title: 'TAULES RECENTS SENSE PRIMARY KEY',
-                  severitat: 'Mitjà',
-                  criticitat: 'Mitjà',
+                  severitat: 'Mitjï¿½',
+                  criticitat: 'Mitjï¿½',
                   status: 'ok',
                   row_count: 1,
                 },
@@ -384,8 +384,8 @@ vi.mock('axios', () => {
                 {
                   check_id: 'CHECK_01',
                   title: 'TAULES RECENTS SENSE PRIMARY KEY',
-                  severitat: 'Mitjà',
-                  criticitat: 'Mitjà',
+                  severitat: 'Mitjï¿½',
+                  criticitat: 'Mitjï¿½',
                   status: 'ok',
                   row_count: 1,
                   columns: ['ESQUEMA', 'TAULA'],
@@ -427,7 +427,16 @@ describe('App smoke tests', () => {
     fireEvent.click(await screen.findByRole('button', { name }));
   }
 
-  test('T1: render inicial sense pantalla negra', async () => {
+  test('Operations is a distinct persisted service-health destination', async () => {
+    render(<App />);
+    const operations = await screen.findByRole('button', { name: 'Operations' });
+    fireEvent.click(operations);
+    expect(await screen.findByRole('heading', { name: 'Operations', exact: true })).toBeInTheDocument();
+    expect(screen.queryByText('Arquitectura d\'auditoria governada per Agents IA.')).not.toBeInTheDocument();
+    await waitFor(() => expect(localStorage.getItem('activeTab')).toBe('Operations'));
+  });
+
+test('T1: render inicial sense pantalla negra', async () => {
     render(<App />);
 
     expect(await screen.findByText('Oracle Audit')).toBeInTheDocument();
@@ -436,11 +445,11 @@ describe('App smoke tests', () => {
     });
   });
 
-  test('T2: pestanya Auditoria BBDD mostra botó Auditar a obsolets', async () => {
+  test('T2: pestanya Auditoria BBDD mostra botï¿½ Auditar a obsolets', async () => {
     render(<App />);
 
     expect(await screen.findByRole('button', { name: /Auditar/i })).toBeInTheDocument();
-    expect(await screen.findByText(/Anàlisi 360/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Anï¿½lisi 360/i)).toBeInTheDocument();
   });
 
   test('T2b: subpestanya Auditoria de canvis renderitza checks post-CRQ', async () => {
@@ -453,11 +462,11 @@ describe('App smoke tests', () => {
     expect(await screen.findByText('Base de dades')).toBeInTheDocument();
     expect((await screen.findAllByRole('combobox')).length).toBeGreaterThan(2);
     expect(await screen.findByText(/Temporalitat/i)).toBeInTheDocument();
-    expect(await screen.findByRole('button', { name: /Obrir configuració/i })).toBeInTheDocument();
-    fireEvent.click(await screen.findByRole('button', { name: /Obrir configuració/i }));
-    expect(await screen.findByText(/Submenú de configuració/i)).toBeInTheDocument();
-    expect(await screen.findByRole('button', { name: /Planificador d'execució/i })).toBeInTheDocument();
-    fireEvent.click(await screen.findByRole('button', { name: /Planificador d'execució/i }));
+    expect(await screen.findByRole('button', { name: /Obrir configuraciï¿½/i })).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: /Obrir configuraciï¿½/i }));
+    expect(await screen.findByText(/Submenï¿½ de configuraciï¿½/i)).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /Planificador d'execuciï¿½/i })).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: /Planificador d'execuciï¿½/i }));
     expect(await screen.findByText(/Risc del pla:/i)).toBeInTheDocument();
     expect((await screen.findAllByText(/Segur|Prudent|Agressiu/i)).length).toBeGreaterThan(0);
     expect(await screen.findByRole('button', { name: /Criticitat de les consultes/i })).toBeInTheDocument();
@@ -474,10 +483,10 @@ describe('App smoke tests', () => {
     fireEvent.click(await screen.findByText('CHECK_01'));
     fireEvent.click(await screen.findByRole('button', { name: /Executar/i }));
 
-    expect(await screen.findByText(/Paràmetres d'execució/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Parï¿½metres d'execuciï¿½/i)).toBeInTheDocument();
     expect((await screen.findAllByText(/Resum executiu per lots/i)).length).toBeGreaterThan(0);
     expect((await screen.findAllByText(/Lot prioritzat/i)).length).toBeGreaterThan(0);
-    expect(await screen.findByText(/Acció inicial:/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Acciï¿½ inicial:/i)).toBeInTheDocument();
     expect(await screen.findByText(/Checks afectats/i)).toBeInTheDocument();
     expect(screen.queryByText(/Resum IA del CHECK_11/i)).not.toBeInTheDocument();
   });
@@ -488,7 +497,7 @@ describe('App smoke tests', () => {
     await openDatabaseAuditSubtab('Automatitzacions');
 
     expect(await screen.findByText(/Programaci/i)).toBeInTheDocument();
-    expect(await screen.findByText(/Jobs d'automatització/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Jobs d'automatitzaciï¿½/i)).toBeInTheDocument();
     expect(await screen.findByText(/Nom del job/i)).toBeInTheDocument();
   });
 
@@ -501,7 +510,7 @@ describe('App smoke tests', () => {
     expect(await screen.findByText(/Safata interna de tasques/i)).toBeInTheDocument();
   });
 
-  test('T3: Configuració del servidor mostra SMTP i rutes', async () => {
+  test('T3: Configuraciï¿½ del servidor mostra SMTP i rutes', async () => {
     render(<App />);
 
     await openDatabaseAuditSubtab(/Configuraci. del servidor/i);
@@ -510,12 +519,12 @@ describe('App smoke tests', () => {
     expect(await screen.findByDisplayValue('tic@example.com')).toBeInTheDocument();
   });
 
-  test('T4: acció de generar report visible', async () => {
+  test('T4: acciï¿½ de generar report visible', async () => {
     render(<App />);
     expect(await screen.findByRole('button', { name: 'Generar Informe' })).toBeInTheDocument();
   });
 
-  test('T5: subpestanya Repositori d’obsolets renderitza el registre', async () => {
+  test('T5: subpestanya Repositori dï¿½obsolets renderitza el registre', async () => {
     render(<App />);
 
     await openDatabaseAuditSubtab("Repositori d'obsolets");
@@ -532,7 +541,7 @@ describe('App smoke tests', () => {
     expect(await screen.findByRole('heading', { name: 'Arquitectura' })).toBeInTheDocument();
   });
 
-  test('T7: la pestanya superior Configuració està deshabilitada', async () => {
+  test('T7: la pestanya superior Configuraciï¿½ estï¿½ deshabilitada', async () => {
     render(<App />);
 
     expect(await screen.findByTitle(/Configuraci. deshabilitada/i)).toBeDisabled();

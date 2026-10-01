@@ -95,6 +95,9 @@ class FindingStore:
               findings_resolved INTEGER NOT NULL DEFAULT 0, red_flags_generated INTEGER NOT NULL DEFAULT 0, error_summary TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_audit_runs_target_time ON audit_runs(database_id, completed_at DESC);
+            CREATE TABLE IF NOT EXISTS finding_reconciliation_receipts (
+              audit_run_id TEXT PRIMARY KEY, database_id TEXT NOT NULL, observed_at REAL NOT NULL
+            );
             """)
 
     def set_target_context(self, database_id: str, *, environment: str = "development", criticality: str = "medium", owner: str = "", tags: Iterable[str] = ()) -> None:
@@ -133,6 +136,17 @@ class FindingStore:
         candidates = [item for item in (self._candidate(result) for result in results) if item]
         seen: set[str] = set()
         with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            receipt = conn.execute("SELECT database_id FROM finding_reconciliation_receipts WHERE audit_run_id=?", (run_id,)).fetchone()
+            if receipt:
+                if receipt[0] != database_id:
+                    raise ValueError("audit_run_target_mismatch")
+                # Repair projections after a crash between committed reconciliation
+                # and projection publication without counting observations twice.
+                conn.commit()
+                self._refresh_red_flags(database_id, now)
+                self._record_audit(run_id, database_id, results, audit_state, now, coverage_valid=bool(evaluated))
+                return {"audit_run_id": run_id, "findings": self.summary(database_id), "red_flags": self.list_red_flags(database_id=database_id), "coverage_valid": bool(evaluated)}
             for candidate in candidates:
                 candidate["database_id"] = candidate["database_id"] or database_id
                 fingerprint = finding_fingerprint(candidate["database_id"], candidate["rule_id"], candidate["object_type"], candidate["owner"], candidate["object_name"])
@@ -160,6 +174,7 @@ class FindingStore:
                     if fingerprint not in seen:
                         conn.execute("UPDATE findings SET status='RESOLVED',delta='RESOLVED',last_seen=?,updated_at=? WHERE id=?", (now, now, finding_id))
                         conn.execute("INSERT OR IGNORE INTO finding_occurrences(finding_id,audit_run_id,observed_at,severity,value,delta,summary,evidence) SELECT id,?,?,?,?,?,?,? FROM findings WHERE id=?", (run_id, now, "LOW", None, "RESOLVED", "Rule passed in a successfully evaluated scope.", "{}", finding_id))
+            conn.execute("INSERT INTO finding_reconciliation_receipts VALUES(?,?,?)", (run_id, database_id, now))
         self._refresh_red_flags(database_id, now)
         self._record_audit(run_id, database_id, results, audit_state, now, coverage_valid=bool(evaluated))
         return {"audit_run_id": run_id, "findings": self.summary(database_id), "red_flags": self.list_red_flags(database_id=database_id), "coverage_valid": bool(evaluated)}

@@ -214,6 +214,7 @@ class AutomationService:
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._operational_maintenance_hook = None
+        self.operations_runtime = None
 
     def set_operational_maintenance_hook(self, hook) -> None:
         """Use the existing scheduler tick for bounded operational side work."""
@@ -230,16 +231,17 @@ class AutomationService:
         self._thread = threading.Thread(target=self._run_loop, name="automation-scheduler", daemon=True)
         self._thread.start()
 
-    def stop(self) -> None:
+    def stop(self, grace_seconds: float = 5) -> None:
         self._stop_event.set()
+        deadline = time.monotonic() + grace_seconds
         if self._thread and self._thread.is_alive():
-            self._thread.join(timeout=5)
+            self._thread.join(timeout=max(0, deadline - time.monotonic()))
             if self._thread.is_alive():
                 logger.warning("Automation scheduler thread did not stop within timeout")
         with self._lock:
             active_threads = list(self._job_threads)
         for thread in active_threads:
-            thread.join(timeout=5)
+            thread.join(timeout=max(0, deadline - time.monotonic()))
             if thread.is_alive():
                 logger.warning("Automation job thread still running during shutdown: %s", thread.name)
 
@@ -252,8 +254,26 @@ class AutomationService:
             self._stop_event.wait(15)
 
     def tick(self) -> None:
+        if self.operations_runtime:
+            if not self.operations_runtime.heartbeat():
+                self._stop_event.set()
+                return
+            self.operations_runtime.last_tick = self.operations_runtime.clock()
         for job in self.store.get_due_jobs():
-            self.run_job(job["id"], manual=False, scheduled_reference=job.get("next_run_at"))
+            if self.operations_runtime and self.operations_runtime.config.missed_policy == "skip":
+                reference = parse_iso_utc(job.get("next_run_at"))
+                if reference and (utc_now() - reference).total_seconds() > 60:
+                    self.store.touch_job_schedule(job["id"], next_run_at=compute_next_run(job["schedule_type"], job.get("schedule_config"), now=utc_now()), last_run_at=job.get("last_run_at"))
+                    continue
+            if self.run_job(job["id"], manual=False, scheduled_reference=job.get("next_run_at")) and self.operations_runtime:
+                job_type = (job.get("schedule_type") or "once").lower()
+                schedule_config = job.get("schedule_config") or {}
+                next_reference = None
+                if job_type == "once":
+                    next_reference = None
+                elif job_type in {"daily", "weekly", "monthly"} and job.get("next_run_at"):
+                    next_reference = compute_next_run(job_type, {**schedule_config, "start_at": job["next_run_at"]}, now=utc_now() + dt.timedelta(seconds=1))
+                self.store.touch_job_schedule(job["id"], next_run_at=next_reference, last_run_at=job.get("last_run_at"))
         self.process_due_retry_queue()
         self.run_scheduled_maintenance()
 
@@ -263,6 +283,8 @@ class AutomationService:
                 self._operational_maintenance_hook()
             except Exception:
                 logger.exception("Operational reporting maintenance failed")
+        if self.operations_runtime:
+            return {"retention": "managed_by_cpd_bounded_policy"}
         config = self.store.get_delivery_config()
         if not bool(config.get("auto_purge_enabled", True)):
             return None
@@ -286,6 +308,8 @@ class AutomationService:
         }
 
     def run_job(self, job_id: int, manual: bool = True, scheduled_reference: Optional[str] = None) -> bool:
+        if self.operations_runtime and any(item["disk_status"] == "CRITICAL" for item in self.operations_runtime.summary().get("storage", [])):
+            return False
         with self._lock:
             if self._stop_event.is_set():
                 return False
@@ -312,7 +336,14 @@ class AutomationService:
 
     def _execute_job_thread(self, job_id: int, manual: bool, scheduled_reference: Optional[str]) -> None:
         try:
-            self.execute_job(job_id, manual=manual, scheduled_reference=scheduled_reference)
+            outcome = self.execute_job(job_id, manual=manual, scheduled_reference=scheduled_reference)
+            if self.operations_runtime:
+                state = outcome.get("status", "unknown")
+                self.operations_runtime.event("Audit Engine", "audit_completed", "HEALTHY" if state == "success" else "DEGRADED", f"Scheduled audit job {job_id} finished with state {state}.")
+        except Exception:
+            if self.operations_runtime:
+                self.operations_runtime.event("Audit Engine", "audit_failed", "DEGRADED", f"Scheduled audit job {job_id} failed; other targets remain available. Review target connectivity in Fleet Dashboard.")
+            logger.error("automation_job_failed", extra={"job_id": job_id, "reason": "audit_or_delivery_failure"})
         finally:
             with self._lock:
                 self._running_jobs.discard(int(job_id))
@@ -334,6 +365,9 @@ class AutomationService:
 
         try:
             report_data = self._run_audit(job)
+            if self._stop_event.is_set():
+                self.store.complete_run(run_id, status="interrupted", error_message="shutdown_requested")
+                return self.store.get_run(run_id)
             if (job.get("audit_type") or "").lower() == "post_crq_distribution":
                 lot_execution = self._build_distribution_execution(job, report_data)
             generation_failure = self._detect_report_generation_failure(job, report_data)
@@ -378,7 +412,7 @@ class AutomationService:
                 if not manual:
                     self.store.touch_job_schedule(
                         job_id,
-                        next_run_at=next_after_reference(job.get("schedule_type"), job.get("schedule_config"), scheduled_reference or job.get("next_run_at")),
+                        next_run_at=self._next_operational_run(job, scheduled_reference),
                         last_run_at=iso_utc(utc_now()),
                     )
                 return self.store.get_run(run_id)
@@ -422,7 +456,7 @@ class AutomationService:
             else:
                 self.store.touch_job_schedule(
                     job_id,
-                    next_run_at=next_after_reference(job.get("schedule_type"), job.get("schedule_config"), scheduled_reference or job.get("next_run_at")),
+                    next_run_at=self._next_operational_run(job, scheduled_reference),
                     last_run_at=iso_utc(utc_now()),
                 )
             return self.store.get_run(run_id)
@@ -473,10 +507,15 @@ class AutomationService:
             if not manual:
                 self.store.touch_job_schedule(
                     job_id,
-                    next_run_at=next_after_reference(job.get("schedule_type"), job.get("schedule_config"), scheduled_reference or job.get("next_run_at")),
+                    next_run_at=self._next_operational_run(job, scheduled_reference),
                     last_run_at=iso_utc(utc_now()),
                 )
             raise
+
+    def _next_operational_run(self, job, reference):
+        if self.operations_runtime:
+            return compute_next_run(job.get("schedule_type"), job.get("schedule_config"), now=utc_now() + dt.timedelta(seconds=1))
+        return next_after_reference(job.get("schedule_type"), job.get("schedule_config"), reference or job.get("next_run_at"))
 
     def _persist_post_crq_analytics(
         self,
