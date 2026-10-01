@@ -213,6 +213,11 @@ class AutomationService:
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
+        self._operational_maintenance_hook = None
+
+    def set_operational_maintenance_hook(self, hook) -> None:
+        """Use the existing scheduler tick for bounded operational side work."""
+        self._operational_maintenance_hook = hook
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -253,6 +258,11 @@ class AutomationService:
         self.run_scheduled_maintenance()
 
     def run_scheduled_maintenance(self) -> Optional[Dict[str, Any]]:
+        if self._operational_maintenance_hook:
+            try:
+                self._operational_maintenance_hook()
+            except Exception:
+                logger.exception("Operational reporting maintenance failed")
         config = self.store.get_delivery_config()
         if not bool(config.get("auto_purge_enabled", True)):
             return None

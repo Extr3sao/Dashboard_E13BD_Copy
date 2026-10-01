@@ -71,6 +71,8 @@ from src.api.security import SecretProvider, SessionStore, SQLExecutionPolicy, r
 from src.api.finding_engine import FindingStore
 from src.api.findings_router import create_findings_router
 from src.api.operations_router import create_operations_router
+from src.api.alerting_engine import AlertingService
+from src.api.alerting_router import create_alerting_router
 
 
 SCHEMA_NAME_PATTERN = re.compile(r"^[A-Z][A-Z0-9_$#]*$")
@@ -88,6 +90,8 @@ finding_store = FindingStore(internal_db)
 automation_store = AutomationStore(resolve_sqlite_path("AUTOMATION_DB_PATH", "automation.db"))
 scoring_engine = ScoringEngine()
 automation_service = AutomationService(automation_store, config_loader)
+alerting_service = AlertingService(finding_store, automation_service)
+automation_service.set_operational_maintenance_hook(alerting_service.run_scheduled_reports)
 
 
 @asynccontextmanager
@@ -110,6 +114,7 @@ logger.info("Starting Oracle Audit API v4.6 (Query Management Module Active)")
 app.include_router(checks_admin_router)
 app.include_router(create_findings_router(finding_store, session_store, SESSION_COOKIE_NAME))
 app.include_router(create_operations_router(finding_store, session_store, SESSION_COOKIE_NAME))
+app.include_router(create_alerting_router(alerting_service, session_store, SESSION_COOKIE_NAME))
 
 # Configurar CORS per permetre al frontend de React (Vite) connectar-se
 def _cors_origins() -> list[str]:
@@ -1032,6 +1037,7 @@ async def run_post_crq(payload: Dict = Body(...)):
         # Findings are reconciled only after the legacy audit completed and emitted
         # normalized results; a failed connection never implies a resolution.
         operational = finding_store.reconcile_post_crq(report, target_context=payload.get("target_context") or {})
+        operational["alerts"] = alerting_service.evaluate((report.get("context") or {}).get("profile", ""))
         report["operational_summary"] = operational["findings"]
         report["red_flags"] = operational["red_flags"]
         report["audit_run_id"] = operational["audit_run_id"]
