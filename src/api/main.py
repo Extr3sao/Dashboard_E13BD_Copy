@@ -75,6 +75,8 @@ from src.api.alerting_engine import AlertingService
 from src.api.alerting_router import create_alerting_router
 from src.api.cpd_operations import OperationsRuntime, OperationsConfig
 from src.api.cpd_router import create_cpd_router
+from src.api.investigation_engine import InvestigationStore
+from src.api.investigations_router import create_investigations_router
 
 
 SCHEMA_NAME_PATTERN = re.compile(r"^[A-Z][A-Z0-9_$#]*$")
@@ -102,6 +104,8 @@ except Exception:
 scoring_engine = ScoringEngine()
 automation_service = AutomationService(automation_store, config_loader)
 alerting_service = AlertingService(finding_store, automation_service)
+investigation_store = InvestigationStore(finding_store)
+finding_store.investigation_service = investigation_store
 automation_service.set_operational_maintenance_hook(alerting_service.run_scheduled_reports)
 operations_runtime = OperationsRuntime(internal_db, automation_store, automation_service, alerting_service, operations_config)
 automation_service.operations_runtime = operations_runtime
@@ -125,6 +129,7 @@ app.include_router(create_findings_router(finding_store, session_store, SESSION_
 app.include_router(create_operations_router(finding_store, session_store, SESSION_COOKIE_NAME))
 app.include_router(create_alerting_router(alerting_service, session_store, SESSION_COOKIE_NAME))
 app.include_router(create_cpd_router(operations_runtime, session_store, SESSION_COOKIE_NAME))
+app.include_router(create_investigations_router(investigation_store, session_store, SESSION_COOKIE_NAME))
 
 # Configurar CORS per permetre al frontend de React (Vite) connectar-se
 def _cors_origins() -> list[str]:

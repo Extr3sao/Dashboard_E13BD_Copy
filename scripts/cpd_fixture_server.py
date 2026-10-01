@@ -46,6 +46,8 @@ main.automation_service._deliver_targets = lambda *_, **__: []
 main.automation_service._apply_rules = lambda *_, **__: []
 if not main.automation_store.list_jobs():
     main.automation_store.create_job({"name": "CPD fixture", "audit_type": "deep_scan", "profile": "CPD-FIXTURE", "schedule_type": "once", "next_run_at": "2020-01-01T00:00:00Z"})
-main.finding_store.set_target_context("CPD-FIXTURE", environment="production", criticality="high")
+main.finding_store.set_target_context("CPD-FIXTURE", environment="production", criticality="critical")
+if not main.finding_store.list_findings(database="CPD-FIXTURE"):
+    main.finding_store.reconcile("CPD-FIXTURE", [{"database_id":"CPD-FIXTURE", "rule_id":"SQL_ELAPSED", "status":"FAIL", "severity":"CRITICAL", "summary":"SQL execution duration increased", "owner":"APP_FIXTURE", "object_name":"ORDERS_FIXTURE", "object_type":"TABLE", "metrics":{"value":11.4,"comparison_direction":"higher_is_worse"}, "evidence":{"elapsed_seconds":11.4,"unit":"s","sql_id":"FIXTURE_SQL"}}], audit_run_id="fixture-investigation", observed_at=time.time())
 
 app = main.app

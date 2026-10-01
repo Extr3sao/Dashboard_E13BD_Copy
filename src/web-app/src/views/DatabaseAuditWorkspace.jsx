@@ -142,7 +142,7 @@ export default function DatabaseAuditWorkspace({
             <ObsoletsRegistryView />
           )}
           {databaseAuditSubtab === SUBTAB_IDS.findings && (
-            <FindingsView />
+            <FindingsView database={selectedProfile} />
           )}
           {databaseAuditSubtab === SUBTAB_IDS.fleetDashboard && <FleetDashboardView />}
           {databaseAuditSubtab === SUBTAB_IDS.alertingReports && <AlertingReportsView />}

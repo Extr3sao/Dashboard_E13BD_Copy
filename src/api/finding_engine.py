@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import sqlite3
 import time
 import uuid
@@ -50,7 +51,17 @@ class FindingStore:
 
     def __init__(self, db_manager: Any):
         self.db = db_manager
+        self.investigation_service = None
         self._migrate()
+
+    def _refresh_investigations(self, database_id: str, observed_at: float) -> None:
+        if self.investigation_service:
+            try:
+                self.investigation_service.on_reconcile(database_id, at=observed_at)
+            except Exception:
+                # Finding/audit persistence must not be rolled back because an
+                # optional derived investigation projection could not refresh.
+                logging.getLogger(__name__).error("investigation_projection_refresh_failed", extra={"database_id": database_id, "reason": "projection_unavailable"})
 
     def _connect(self):
         return self.db._get_connection()
@@ -129,6 +140,7 @@ class FindingStore:
         if _normalized(audit_state) != "SUCCESS":
             self._upsert_run_health(database_id, "AUDIT_EXECUTION_FAILURE", now, "Audit execution did not complete; existing findings were not resolved.")
             self._record_audit(run_id, database_id, results, audit_state, now, coverage_valid=False)
+            self._refresh_investigations(database_id, now)
             return {"audit_run_id": run_id, "findings": self.summary(database_id), "red_flags": self.list_red_flags(database_id=database_id), "coverage_valid": False}
         evaluated = {_text(item.get("rule_id")) for item in results if _normalized(item.get("status")) in VALID_STATUSES}
         if any(_normalized(item.get("status")) in {"ERROR", "SKIPPED"} for item in results):
@@ -146,6 +158,7 @@ class FindingStore:
                 conn.commit()
                 self._refresh_red_flags(database_id, now)
                 self._record_audit(run_id, database_id, results, audit_state, now, coverage_valid=bool(evaluated))
+                self._refresh_investigations(database_id, now)
                 return {"audit_run_id": run_id, "findings": self.summary(database_id), "red_flags": self.list_red_flags(database_id=database_id), "coverage_valid": bool(evaluated)}
             for candidate in candidates:
                 candidate["database_id"] = candidate["database_id"] or database_id
@@ -177,6 +190,7 @@ class FindingStore:
             conn.execute("INSERT INTO finding_reconciliation_receipts VALUES(?,?,?)", (run_id, database_id, now))
         self._refresh_red_flags(database_id, now)
         self._record_audit(run_id, database_id, results, audit_state, now, coverage_valid=bool(evaluated))
+        self._refresh_investigations(database_id, now)
         return {"audit_run_id": run_id, "findings": self.summary(database_id), "red_flags": self.list_red_flags(database_id=database_id), "coverage_valid": bool(evaluated)}
 
     def _record_audit(self, run_id: str, database_id: str, results: list[dict[str, Any]], state: str, now: float, *, coverage_valid: bool) -> None:

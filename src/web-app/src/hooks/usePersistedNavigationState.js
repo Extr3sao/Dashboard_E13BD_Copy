@@ -27,7 +27,7 @@ function normalizeDatabaseAuditSubtab(storedMainTab, storedSubtab) {
 export default function usePersistedNavigationState() {
   const [activeTab, setActiveTab] = useState(() => {
     const storedTab = localStorage.getItem('activeTab') || 'Auditoria BBDD';
-    const availableTabs = ['Auditoria BBDD', 'Operations'];
+    const availableTabs = ['Auditoria BBDD', 'Operations', 'Investigations'];
     return availableTabs.includes(storedTab) ? storedTab : 'Auditoria BBDD';
   });
   const [selectedProfile, setSelectedProfile] = useState(() => getRequestedProfile() || localStorage.getItem('selectedProfile') || '');

@@ -104,6 +104,13 @@ try {
   await page.getByRole('button', { name: 'Preview retention purge' }).click();
   await page.getByText('Purge preview — no changes made').waitFor();
   await page.screenshot({ path: path.join(work, 'operations-healthy.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Investigations', exact: true }).click();
+  await page.getByRole('heading', { name: 'Investigations', exact: true }).waitFor();
+  await page.getByText('SQL execution duration increased', { exact: true }).first().waitFor();
+  await page.getByRole('button', { name: /SQL execution duration increased/ }).click();
+  await page.getByText('FACT · PERFORMANCE', { exact: true }).first().waitFor();
+  await page.getByText('Compare execution duration and workload before and after first observation.', { exact: true }).waitFor();
+  await page.screenshot({ path: path.join(work, 'investigation-detail.png'), fullPage: true });
   assert(errors.length === 0, `browser errors: ${errors.join('; ')}`);
   console.log(JSON.stringify({ status: 'PASS', scenario: 'CPD failure/recovery with real HTTP, browser, scheduler and killed process', evidence: work }, null, 2));
 } finally {

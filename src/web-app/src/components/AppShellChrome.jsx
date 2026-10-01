@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, ShieldAlert, Network } from 'lucide-react';
+import { Settings, ShieldAlert, Network, Search } from 'lucide-react';
 
 function SidebarItem({ icon: Icon, label, active, onClick }) {
   return (
@@ -75,6 +75,7 @@ export default function AppShellChrome({
 
       <nav className="top-nav" aria-label="Navegació principal">
         <SidebarItem icon={Settings} label="Operations" active={activeTab === 'Operations'} onClick={() => onSelectMainTab('Operations')} />
+        <SidebarItem icon={Search} label="Investigations" active={activeTab === 'Investigations'} onClick={() => onSelectMainTab('Investigations')} />
         <SidebarItem
           icon={ShieldAlert}
           label="Auditoria BBDD"

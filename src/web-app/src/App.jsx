@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import AppPageHeader from './components/AppPageHeader.jsx';
@@ -23,6 +23,7 @@ import useProfiles from './hooks/useProfiles.js';
 const DatabaseAuditWorkspace = lazy(() => import('./views/DatabaseAuditWorkspace.jsx'));
 const SystemArchitectureView = lazy(() => import('./views/SystemArchitectureView.jsx'));
 const OperationsView = lazy(() => import('./views/OperationsView.jsx'));
+const InvestigationsView = lazy(() => import('./views/InvestigationsView.jsx'));
 
 
 function App() {
@@ -39,6 +40,15 @@ function App() {
     databaseAuditSubtab,
     setDatabaseAuditSubtab,
   } = usePersistedNavigationState();
+  useEffect(() => {
+    const listener = (event) => {
+      if (!event.detail?.id) return;
+      localStorage.setItem('e13db:selected-investigation-id', String(event.detail.id));
+      setActiveTab('Investigations');
+    };
+    window.addEventListener('e13db-open-investigation', listener);
+    return () => window.removeEventListener('e13db-open-investigation', listener);
+  }, [setActiveTab]);
   const { profiles } = useProfiles({
     apiBase: API_BASE,
     onDefaultProfile: setSelectedProfile,
@@ -109,8 +119,8 @@ function App() {
     activeTab === 'Auditoria BBDD'
       && DATABASE_AUDIT_SUBTABS_HIDE_PROFILE_SELECTOR.includes(databaseAuditSubtab)
   );
-   const showHeaderProfileSelector = !hideEmbeddedProfileSelector && activeTab !== 'Operations';
-   const showGlobalReportControls = activeTab !== 'Operations' && !(
+   const showHeaderProfileSelector = !hideEmbeddedProfileSelector && !['Operations', 'Investigations'].includes(activeTab);
+   const showGlobalReportControls = !['Operations', 'Investigations'].includes(activeTab) && !(
     activeTab === 'Auditoria BBDD'
       && DATABASE_AUDIT_SUBTABS_HIDE_GLOBAL_REPORT.includes(databaseAuditSubtab)
   );
@@ -162,7 +172,8 @@ function App() {
           >
             <Suspense fallback={<div className="glass-card p-6 text-sm text-muted-foreground">Carregant vista...</div>}>
               {activeTab === 'Operations' && <OperationsView />}
-              {activeTab !== 'Operations' && <AppPageHeader
+              {activeTab === 'Investigations' && <InvestigationsView />}
+              {!['Operations', 'Investigations'].includes(activeTab) && <AppPageHeader
                 activeTab={activeTab}
                 subtabLabel={activeTab === 'Auditoria BBDD' ? databaseAuditSubtab : null}
                 helpKey={currentPageHelpKey}
