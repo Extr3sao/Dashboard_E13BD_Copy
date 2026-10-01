@@ -286,12 +286,29 @@ class InvestigationStore:
         with self._connect() as conn:
             rows=self._rows(conn,"SELECT * FROM investigations"+where+" ORDER BY CASE status WHEN 'OPEN' THEN 0 WHEN 'MONITORING' THEN 1 WHEN 'RESOLVED' THEN 2 ELSE 3 END,updated_at DESC LIMIT ? OFFSET ?",(*args,limit,offset))
             total=conn.execute("SELECT COUNT(*) FROM investigations"+where,args).fetchone()[0]
+            if rows:
+                case_ids=[int(row["id"]) for row in rows]
+                placeholders=','.join('?' for _ in case_ids)
+                finding_ids=[int(row["primary_finding_id"]) for row in rows if row["primary_finding_id"]]
+                finding_map={}
+                if finding_ids:
+                    finding_marks=','.join('?' for _ in finding_ids)
+                    finding_map={int(item["id"]):item for item in self._rows(conn,f"SELECT id,database_id,rule_id,summary,severity,status,delta,first_seen,last_seen,owner,object_name,object_type FROM findings WHERE id IN ({finding_marks})",finding_ids)}
+                hypothesis_map={}
+                for item in self._rows(conn,f"SELECT investigation_id,title FROM investigation_hypotheses WHERE investigation_id IN ({placeholders}) ORDER BY id",case_ids):
+                    hypothesis_map.setdefault(int(item["investigation_id"]),item["title"])
+                check_map={}
+                for item in self._rows(conn,f"SELECT investigation_id,description FROM investigation_checks WHERE status='PENDING' AND investigation_id IN ({placeholders}) ORDER BY id",case_ids):
+                    check_map.setdefault(int(item["investigation_id"]),item["description"])
+                count_map={int(item["investigation_id"]):int(item["count"]) for item in self._rows(conn,f"SELECT investigation_id,COUNT(*) AS count FROM investigation_correlations WHERE investigation_id IN ({placeholders}) GROUP BY investigation_id",case_ids)}
+                relation_map={int(item["investigation_id"]):item for item in self._rows(conn,f"SELECT c.investigation_id,c.category,c.strength,c.reasons_json,c.occurred_at FROM investigation_correlations c WHERE c.investigation_id IN ({placeholders}) AND c.id=(SELECT r.id FROM investigation_correlations r WHERE r.investigation_id=c.investigation_id ORDER BY r.occurred_at DESC,r.id DESC LIMIT 1)",case_ids)}
+            else:
+                finding_map=hypothesis_map=check_map=count_map=relation_map={}
         items=[]
         for row in rows:
-            finding = self.findings.get_finding(row["primary_finding_id"]) if row["primary_finding_id"] else None
-            hypotheses=self._rows_for("SELECT * FROM investigation_hypotheses WHERE investigation_id=? ORDER BY id",(row["id"],))
-            relation=self._rows_for("SELECT category,strength,reasons_json,occurred_at FROM investigation_correlations WHERE investigation_id=? ORDER BY occurred_at DESC LIMIT 1",(row["id"],))
-            items.append({**row,"primary_finding":self._finding_summary(finding),"top_hypothesis":hypotheses[0]["title"] if hypotheses else None,"next_recommended_check":self._next_check(row["id"]),"related_findings_count":len(self._rows_for("SELECT id FROM investigation_correlations WHERE investigation_id=?",(row["id"],))),"recent_correlation":({**relation[0],"reasons":_json(relation[0]["reasons_json"],[])} if relation else None)})
+            case_id=int(row["id"]); finding=finding_map.get(int(row["primary_finding_id"])) if row["primary_finding_id"] else None
+            relation=relation_map.get(case_id)
+            items.append({**row,"primary_finding":self._finding_summary(finding),"top_hypothesis":hypothesis_map.get(case_id),"next_recommended_check":check_map.get(case_id),"related_findings_count":count_map.get(case_id,0),"recent_correlation":({**relation,"reasons":_json(relation["reasons_json"],[])} if relation else None)})
         return {"items":items,"total":total,"limit":limit,"offset":offset}
 
     def _rows_for(self, sql, args=()):

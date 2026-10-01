@@ -1,0 +1,37 @@
+{
+  "schema": "E13DB_ARCH_REVIEW_SCALE_V1",
+  "synthetic": true,
+  "production_data": false,
+  "targets": 100,
+  "days": 365,
+  "audits_per_day_per_target": 2,
+  "rules_per_audit": 4,
+  "configured_findings": 5000,
+  "configured_alerts": 2000,
+  "configured_investigations": 500,
+  "counts": {
+    "audit_runs": 73000,
+    "findings": 5000,
+    "finding_occurrences": 25000,
+    "red_flags": 2000,
+    "alert_events": 2000,
+    "investigations": 500,
+    "investigation_evidence": 5000,
+    "automation_job_runs": 73000,
+    "rule_results": 292000
+  },
+  "timings_seconds": {
+    "fleet_dashboard_100_targets": 1.5189,
+    "finding_list_5000": 0.3519,
+    "audit_history_365d_target": 0.0095,
+    "alert_list_2000": 0.0117,
+    "report_list": 0.0038,
+    "investigation_list_500": 0.0112,
+    "investigation_detail_with_timeline_and_correlation": 0.0512
+  },
+  "limitations": [
+    "Synthetic SQLite rows exercise repository schemas and query surfaces, not Oracle connection/driver latency.",
+    "One local Windows host and SQLite files; timings are evidence for relative query cost only, not production capacity SLOs.",
+    "No SQL text, credentials or production data are inserted."
+  ]
+}

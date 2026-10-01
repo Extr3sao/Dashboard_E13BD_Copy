@@ -111,6 +111,24 @@ try {
   await page.getByText('FACT · PERFORMANCE', { exact: true }).first().waitFor();
   await page.getByText('Compare execution duration and workload before and after first observation.', { exact: true }).waitFor();
   await page.screenshot({ path: path.join(work, 'investigation-detail.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Auditoria BBDD', exact: true }).click();
+  await page.getByRole('button', { name: 'Quadre operatiu', exact: true }).click();
+  await page.getByRole('heading', { name: 'Fleet Dashboard', exact: true }).waitFor();
+  await page.getByRole('button', { name: /CPD-FIXTURE/ }).first().click();
+  await page.getByRole('heading', { name: /CPD-FIXTURE: CRITICAL/ }).waitFor();
+  await page.getByText('Recent audit history', { exact: true }).waitFor();
+  await page.screenshot({ path: path.join(work, 'database-detail.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('button', { name: 'Problemes', exact: true }).click();
+  await page.getByRole('heading', { name: 'Problems', exact: true }).waitFor();
+  await page.getByRole('button', { name: /Fixture capacity issue/ }).last().click();
+  await page.getByRole('dialog', { name: 'Finding detail' }).waitFor();
+  await page.getByRole('button', { name: 'Open investigation for this Finding' }).click();
+  await page.getByRole('heading', { name: 'Investigations', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Auditoria BBDD', exact: true }).click();
+  await page.getByRole('button', { name: 'Alertes i informes', exact: true }).click();
+  await page.getByRole('heading', { name: /Alerts & Reports/ }).waitFor();
+  await page.screenshot({ path: path.join(work, 'alerts-reports.png'), fullPage: true });
   assert(errors.length === 0, `browser errors: ${errors.join('; ')}`);
   console.log(JSON.stringify({ status: 'PASS', scenario: 'CPD failure/recovery with real HTTP, browser, scheduler and killed process', evidence: work }, null, 2));
 } finally {

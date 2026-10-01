@@ -220,9 +220,37 @@ class FindingStore:
         return {"database_id": database_id, "name": database_id, "environment": context["environment"], "criticality": context["criticality"], "health_status": status, "health_reason": reason, "last_audit": audit, "reachable": status != "UNREACHABLE", "active_findings": len(active), "critical_findings": sum(item["severity"] == "CRITICAL" for item in active), "worsening_findings": sum(item["delta"] == "WORSENING" for item in active), "new_findings": sum(item["delta"] == "NEW" for item in active), "red_flags": len(flags), "highest_priority": flags[0]["priority"] if flags else None}
 
     def fleet(self, *, now: float | None = None) -> dict[str, Any]:
-        ids = [row["database_id"] for row in self._rows("SELECT database_id FROM target_contexts UNION SELECT database_id FROM audit_runs UNION SELECT database_id FROM findings")]
-        targets = sorted((self.health(database_id, now=now) for database_id in set(ids)), key=lambda item: ({"CRITICAL": 0, "UNREACHABLE": 1, "AUDIT_FAILED": 2, "DEGRADED": 3, "ATTENTION": 4, "UNKNOWN": 5, "NOT_AUDITED": 6, "HEALTHY": 7}.get(item["health_status"], 8), item["name"]))
-        return {"targets": targets, "counts": {key: sum(item["health_status"] == key for item in targets) for key in ("HEALTHY", "ATTENTION", "CRITICAL", "UNREACHABLE", "DEGRADED", "UNKNOWN", "NOT_AUDITED")}, "findings": self.summary()["findings"], "red_flags": self.summary()["red_flags"], "needs_attention": self.list_red_flags()}
+        now=time.time() if now is None else now
+        ids={row["database_id"] for row in self._rows("SELECT database_id FROM target_contexts UNION SELECT database_id FROM audit_runs UNION SELECT database_id FROM findings")}
+        contexts={row["database_id"]:row for row in self._rows("SELECT * FROM target_contexts")}
+        audits={row["database_id"]:row for row in self._rows("SELECT * FROM (SELECT audit_runs.*,ROW_NUMBER() OVER (PARTITION BY database_id ORDER BY completed_at DESC,audit_run_id DESC) AS rn FROM audit_runs) WHERE rn=1")}
+        activity={row["database_id"]:row for row in self._rows("SELECT database_id,COUNT(*) AS active_findings,SUM(CASE WHEN severity='CRITICAL' THEN 1 ELSE 0 END) AS critical_findings,SUM(CASE WHEN delta='WORSENING' THEN 1 ELSE 0 END) AS worsening_findings,SUM(CASE WHEN delta='NEW' THEN 1 ELSE 0 END) AS new_findings FROM findings WHERE status!='RESOLVED' GROUP BY database_id")}
+        all_deltas=self._rows("SELECT delta,COUNT(*) AS count FROM findings GROUP BY delta")
+        finding_counts={key:0 for key in ("NEW","WORSENING","PERSISTENT","IMPROVING","RESOLVED","REOPENED")}
+        for row in all_deltas:
+            if row["delta"] in finding_counts: finding_counts[row["delta"]]=row["count"]
+        flags=self.list_red_flags()
+        flags_by_database={}
+        red_counts={key:0 for key in ("P1","P2","P3","P4")}
+        for flag in flags:
+            flags_by_database.setdefault(flag["database_id"],[]).append(flag)
+            if flag["priority"] in red_counts: red_counts[flag["priority"]]+=1
+        targets=[]
+        for database_id in ids:
+            audit=audits.get(database_id); context=contexts.get(database_id,{"environment":"development","criticality":"medium","owner":"","tags":"[]"})
+            counts=activity.get(database_id,{"active_findings":0,"critical_findings":0,"worsening_findings":0,"new_findings":0})
+            target_flags=flags_by_database.get(database_id,[])
+            if not audit: status,reason="NOT_AUDITED","No completed audit is available."
+            elif audit["state"]!="SUCCESS": status,reason=("UNREACHABLE" if any(flag["flag_type"]=="DATABASE_UNREACHABLE" for flag in target_flags) else "AUDIT_FAILED"),"The latest audit did not complete successfully."
+            elif now-audit["completed_at"]>86400: status,reason="UNKNOWN","The latest successful audit is stale."
+            elif audit["coverage_state"]!="FULL": status,reason="DEGRADED",f"Coverage is {audit['coverage_state'].lower()}: {audit['checks_error']} error, {audit['checks_skipped']} skipped."
+            elif any(flag["priority"] in {"P1","P2"} for flag in target_flags) or counts["critical_findings"]: status,reason="CRITICAL","Critical findings or high-priority red flags require action."
+            elif counts["active_findings"] or target_flags: status,reason="ATTENTION","Active findings require operator attention."
+            else: status,reason="HEALTHY","Latest audit completed with full coverage and no active findings."
+            targets.append({"database_id":database_id,"name":database_id,"environment":context["environment"],"criticality":context["criticality"],"health_status":status,"health_reason":reason,"last_audit":audit,"reachable":status!="UNREACHABLE","active_findings":counts["active_findings"],"critical_findings":counts["critical_findings"],"worsening_findings":counts["worsening_findings"],"new_findings":counts["new_findings"],"red_flags":len(target_flags),"highest_priority":target_flags[0]["priority"] if target_flags else None})
+        priority={"CRITICAL":0,"UNREACHABLE":1,"AUDIT_FAILED":2,"DEGRADED":3,"ATTENTION":4,"UNKNOWN":5,"NOT_AUDITED":6,"HEALTHY":7}
+        targets.sort(key=lambda item:(priority.get(item["health_status"],8),item["name"]))
+        return {"targets":targets,"counts":{key:sum(item["health_status"]==key for item in targets) for key in ("HEALTHY","ATTENTION","CRITICAL","UNREACHABLE","DEGRADED","UNKNOWN","NOT_AUDITED")},"findings":finding_counts,"red_flags":red_counts,"needs_attention":flags}
 
     def audit_history(self, database_id: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
         return self._rows("SELECT * FROM audit_runs" + (" WHERE database_id=?" if database_id else "") + " ORDER BY completed_at DESC LIMIT ?", ((database_id, max(1, min(limit, 200))) if database_id else (max(1, min(limit, 200)),)))
