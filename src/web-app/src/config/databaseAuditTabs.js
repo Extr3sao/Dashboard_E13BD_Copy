@@ -1,4 +1,5 @@
 export const DATABASE_AUDIT_SUBTABS = [
+  { id: 'Quadre operatiu', helpKey: 'fleetDashboard' },
   { id: 'Anàlisi obsolets', helpKey: 'deepScan' },
   { id: "Repositori d'obsolets", helpKey: 'obsoletsRepository' },
   { id: 'Auditoria de canvis', helpKey: 'postCrqAudit' },

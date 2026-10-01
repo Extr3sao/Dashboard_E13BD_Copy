@@ -86,6 +86,15 @@ class FindingStore:
               first_seen REAL NOT NULL, last_seen REAL NOT NULL, occurrences INTEGER NOT NULL DEFAULT 1, created_at REAL NOT NULL, updated_at REAL NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_red_flags_active ON red_flags(status, priority, database_id);
+            CREATE TABLE IF NOT EXISTS audit_runs (
+              audit_run_id TEXT PRIMARY KEY, database_id TEXT NOT NULL, state TEXT NOT NULL,
+              started_at REAL NOT NULL, completed_at REAL NOT NULL, duration_seconds REAL NOT NULL DEFAULT 0,
+              checks_total INTEGER NOT NULL DEFAULT 0, checks_pass INTEGER NOT NULL DEFAULT 0, checks_warn INTEGER NOT NULL DEFAULT 0,
+              checks_fail INTEGER NOT NULL DEFAULT 0, checks_error INTEGER NOT NULL DEFAULT 0, checks_skipped INTEGER NOT NULL DEFAULT 0,
+              coverage_state TEXT NOT NULL, coverage_ratio REAL, findings_created INTEGER NOT NULL DEFAULT 0,
+              findings_resolved INTEGER NOT NULL DEFAULT 0, red_flags_generated INTEGER NOT NULL DEFAULT 0, error_summary TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_audit_runs_target_time ON audit_runs(database_id, completed_at DESC);
             """)
 
     def set_target_context(self, database_id: str, *, environment: str = "development", criticality: str = "medium", owner: str = "", tags: Iterable[str] = ()) -> None:
@@ -116,6 +125,7 @@ class FindingStore:
         results = [dict(item) for item in rule_results]
         if _normalized(audit_state) != "SUCCESS":
             self._upsert_run_health(database_id, "AUDIT_EXECUTION_FAILURE", now, "Audit execution did not complete; existing findings were not resolved.")
+            self._record_audit(run_id, database_id, results, audit_state, now, coverage_valid=False)
             return {"audit_run_id": run_id, "findings": self.summary(database_id), "red_flags": self.list_red_flags(database_id=database_id), "coverage_valid": False}
         evaluated = {_text(item.get("rule_id")) for item in results if _normalized(item.get("status")) in VALID_STATUSES}
         if any(_normalized(item.get("status")) in {"ERROR", "SKIPPED"} for item in results):
@@ -151,7 +161,47 @@ class FindingStore:
                         conn.execute("UPDATE findings SET status='RESOLVED',delta='RESOLVED',last_seen=?,updated_at=? WHERE id=?", (now, now, finding_id))
                         conn.execute("INSERT OR IGNORE INTO finding_occurrences(finding_id,audit_run_id,observed_at,severity,value,delta,summary,evidence) SELECT id,?,?,?,?,?,?,? FROM findings WHERE id=?", (run_id, now, "LOW", None, "RESOLVED", "Rule passed in a successfully evaluated scope.", "{}", finding_id))
         self._refresh_red_flags(database_id, now)
+        self._record_audit(run_id, database_id, results, audit_state, now, coverage_valid=bool(evaluated))
         return {"audit_run_id": run_id, "findings": self.summary(database_id), "red_flags": self.list_red_flags(database_id=database_id), "coverage_valid": bool(evaluated)}
+
+    def _record_audit(self, run_id: str, database_id: str, results: list[dict[str, Any]], state: str, now: float, *, coverage_valid: bool) -> None:
+        counts = {_normalized(item.get("status")): 0 for item in results}
+        for item in results: counts[_normalized(item.get("status"))] = counts.get(_normalized(item.get("status")), 0) + 1
+        total = len(results); evaluated = sum(counts.get(key, 0) for key in VALID_STATUSES)
+        coverage = "FULL" if total and evaluated == total else ("PARTIAL" if evaluated else "UNKNOWN")
+        if counts.get("ERROR", 0) or counts.get("SKIPPED", 0): coverage = "DEGRADED" if evaluated == 0 else "PARTIAL"
+        with self._connect() as conn:
+            conn.execute("INSERT OR REPLACE INTO audit_runs(audit_run_id,database_id,state,started_at,completed_at,checks_total,checks_pass,checks_warn,checks_fail,checks_error,checks_skipped,coverage_state,coverage_ratio,error_summary) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (run_id, database_id, _normalized(state), now, now, total, counts.get("PASS", 0), counts.get("WARN", 0), counts.get("FAIL", 0), counts.get("ERROR", 0), counts.get("SKIPPED", 0), coverage, (evaluated / total) if total else None, None))
+
+    def _latest_audit(self, database_id: str) -> dict[str, Any] | None:
+        rows = self._rows("SELECT * FROM audit_runs WHERE database_id=? ORDER BY completed_at DESC LIMIT 1", (database_id,))
+        return rows[0] if rows else None
+
+    def health(self, database_id: str, *, now: float | None = None, stale_after_seconds: float = 86400) -> dict[str, Any]:
+        now = time.time() if now is None else now; audit = self._latest_audit(database_id)
+        context_rows = self._rows("SELECT * FROM target_contexts WHERE database_id=?", (database_id,)); context = context_rows[0] if context_rows else {"environment": "development", "criticality": "medium", "owner": "", "tags": "[]"}
+        active = self.list_findings(database=database_id); flags = self.list_red_flags(database_id=database_id)
+        if not audit: status, reason = "NOT_AUDITED", "No completed audit is available."
+        elif audit["state"] != "SUCCESS": status, reason = ("UNREACHABLE" if any(item["flag_type"] == "DATABASE_UNREACHABLE" for item in flags) else "AUDIT_FAILED"), "The latest audit did not complete successfully."
+        elif now - audit["completed_at"] > stale_after_seconds: status, reason = "UNKNOWN", "The latest successful audit is stale."
+        elif audit["coverage_state"] != "FULL": status, reason = "DEGRADED", f"Coverage is {audit['coverage_state'].lower()}: {audit['checks_error']} error, {audit['checks_skipped']} skipped."
+        elif any(item["priority"] in {"P1", "P2"} for item in flags) or any(item["severity"] == "CRITICAL" for item in active): status, reason = "CRITICAL", "Critical findings or high-priority red flags require action."
+        elif active or flags: status, reason = "ATTENTION", "Active findings require operator attention."
+        else: status, reason = "HEALTHY", "Latest audit completed with full coverage and no active findings."
+        return {"database_id": database_id, "name": database_id, "environment": context["environment"], "criticality": context["criticality"], "health_status": status, "health_reason": reason, "last_audit": audit, "reachable": status != "UNREACHABLE", "active_findings": len(active), "critical_findings": sum(item["severity"] == "CRITICAL" for item in active), "worsening_findings": sum(item["delta"] == "WORSENING" for item in active), "new_findings": sum(item["delta"] == "NEW" for item in active), "red_flags": len(flags), "highest_priority": flags[0]["priority"] if flags else None}
+
+    def fleet(self, *, now: float | None = None) -> dict[str, Any]:
+        ids = [row["database_id"] for row in self._rows("SELECT database_id FROM target_contexts UNION SELECT database_id FROM audit_runs UNION SELECT database_id FROM findings")]
+        targets = sorted((self.health(database_id, now=now) for database_id in set(ids)), key=lambda item: ({"CRITICAL": 0, "UNREACHABLE": 1, "AUDIT_FAILED": 2, "DEGRADED": 3, "ATTENTION": 4, "UNKNOWN": 5, "NOT_AUDITED": 6, "HEALTHY": 7}.get(item["health_status"], 8), item["name"]))
+        return {"targets": targets, "counts": {key: sum(item["health_status"] == key for item in targets) for key in ("HEALTHY", "ATTENTION", "CRITICAL", "UNREACHABLE", "DEGRADED", "UNKNOWN", "NOT_AUDITED")}, "findings": self.summary()["findings"], "red_flags": self.summary()["red_flags"], "needs_attention": self.list_red_flags()}
+
+    def audit_history(self, database_id: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+        return self._rows("SELECT * FROM audit_runs" + (" WHERE database_id=?" if database_id else "") + " ORDER BY completed_at DESC LIMIT ?", ((database_id, max(1, min(limit, 200))) if database_id else (max(1, min(limit, 200)),)))
+
+    def trends(self, database_id: str | None = None, window_hours: int = 168, *, now: float | None = None) -> list[dict[str, Any]]:
+        now = time.time() if now is None else now; start = now - max(1, window_hours) * 3600; where = "completed_at>=?" + (" AND database_id=?" if database_id else ""); args = (start, database_id) if database_id else (start,)
+        rows = self._rows("SELECT * FROM audit_runs WHERE " + where + " ORDER BY completed_at", args)
+        return [{"at": row["completed_at"], "active_findings": len(self.list_findings(database=row["database_id"])), "critical_findings": sum(item["severity"] == "CRITICAL" for item in self.list_findings(database=row["database_id"])), "red_flags": len(self.list_red_flags(database_id=row["database_id"])), "unreachable": int(row["state"] != "SUCCESS"), "failed_audits": int(row["state"] != "SUCCESS"), "coverage": row["coverage_ratio"]} for row in rows]
 
     def reconcile_post_crq(self, report: dict[str, Any], *, target_context: dict[str, Any] | None = None) -> dict[str, Any]:
         """Use bounded row envelopes when Post-CRQ can identify the affected object."""

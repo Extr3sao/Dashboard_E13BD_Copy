@@ -11,6 +11,7 @@ const ChecksAdminView = lazy(() => import('./ChecksAdminView.jsx'));
 const MailConfigView = lazy(() => import('./MailConfigView.jsx'));
 const DeepScanView = lazy(() => import('./DeepScanView.jsx'));
 const FindingsView = lazy(() => import('./FindingsView.jsx'));
+const FleetDashboardView = lazy(() => import('./FleetDashboardView.jsx'));
 const SUBTAB_IDS = Object.fromEntries(
   DATABASE_AUDIT_SUBTABS.map((tab) => [tab.helpKey, tab.id])
 );
@@ -142,6 +143,7 @@ export default function DatabaseAuditWorkspace({
           {databaseAuditSubtab === SUBTAB_IDS.findings && (
             <FindingsView />
           )}
+          {databaseAuditSubtab === SUBTAB_IDS.fleetDashboard && <FleetDashboardView />}
           {databaseAuditSubtab === SUBTAB_IDS.tutorial && (
             <TutorialView />
           )}

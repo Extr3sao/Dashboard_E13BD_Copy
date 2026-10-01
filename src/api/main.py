@@ -70,6 +70,7 @@ from src.api.checks_admin_router import router as checks_admin_router
 from src.api.security import SecretProvider, SessionStore, SQLExecutionPolicy, redact_secrets, require_csrf, require_user
 from src.api.finding_engine import FindingStore
 from src.api.findings_router import create_findings_router
+from src.api.operations_router import create_operations_router
 
 
 SCHEMA_NAME_PATTERN = re.compile(r"^[A-Z][A-Z0-9_$#]*$")
@@ -108,6 +109,7 @@ app = FastAPI(title="Oracle Audit API", version="4.6", lifespan=lifespan)
 logger.info("Starting Oracle Audit API v4.6 (Query Management Module Active)")
 app.include_router(checks_admin_router)
 app.include_router(create_findings_router(finding_store, session_store, SESSION_COOKIE_NAME))
+app.include_router(create_operations_router(finding_store, session_store, SESSION_COOKIE_NAME))
 
 # Configurar CORS per permetre al frontend de React (Vite) connectar-se
 def _cors_origins() -> list[str]:
