@@ -9,6 +9,7 @@ import sys
 import time
 import traceback
 import unicodedata
+import uuid
 import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -3842,6 +3843,7 @@ def run_post_crq_audit(
     criticality_overrides: Optional[Dict[str, Any]] = None,
     ownership_db_path: Optional[str] = None,
     scheduler_options: Optional[Dict[str, Any]] = None,
+    audit_context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     path = markdown_path or resolve_post_crq_markdown_path()
     available_checks = parse_post_crq_checks(path)
@@ -3853,6 +3855,30 @@ def run_post_crq_audit(
     missing = [check_id for check_id in selected_ids if check_id not in lookup]
     if missing:
         raise ValueError(f"Checks no trobats: {', '.join(missing)}")
+
+    from src.api.audit_evidence import discover_oracle_capabilities, rule_capability_skip_reason, rule_pack_identity, runtime_identity
+    rule_definitions = {
+        item["check_id"]: definition_from_post_crq(
+            item, timeout=timeout_for_category(resolve_scheduler_config(scheduler_options), classify_check_category(item["check_id"], item.get("sql") or ""))
+        ) for item in available_checks
+    }
+    selected_definitions=[rule_definitions[check_id] for check_id in selected_ids]
+    required_privileges=sorted({privilege for rule in selected_definitions for privilege in rule.required_privileges})
+    license_flags={"awr_license":os.getenv("E13DB_ORACLE_AWR_LICENSED","false").lower()=="true","awr_privilege":os.getenv("E13DB_ORACLE_AWR_PRIVILEGE","false").lower()=="true","ash_license":os.getenv("E13DB_ORACLE_ASH_LICENSED","false").lower()=="true","ash_privilege":os.getenv("E13DB_ORACLE_ASH_PRIVILEGE","false").lower()=="true"}
+    capability_snapshot=discover_oracle_capabilities(db_manager,profile,license_flags=license_flags,required_privileges=required_privileges)
+    execution_ids=[]
+    capability_skips=[]
+    for check_id in selected_ids:
+        check=lookup[check_id]; definition=rule_definitions[check_id]
+        reason=rule_capability_skip_reason(definition,capability_snapshot,license_flags)
+        if reason:
+            category=classify_check_category(check_id,check.get("sql") or "")
+            capability_skips.append({"check_id":check_id,"title":check.get("title") or check_id,"severitat":check.get("severitat"),"criticitat":check.get("severitat"),"criticitat_key":_resolve_check_criticality(check_id,default_severity=check.get("severitat")),"severitat_original":check.get("severitat"),"criteri":reason,"status":"skipped","row_count":0,"columns":[],"rows":[],"error":None,"duration_ms":0,"query_category":category.value,"ai_enabled":check.get("ai_enabled",0),"capability_skip_reason":reason})
+        else:
+            execution_ids.append(check_id)
+    rule_pack_id=rule_pack_identity(selected_definitions)
+    audit_context=dict(audit_context or {})
+    audit_run_id=str(audit_context.get("audit_run_id") or ("AUD-MAN-"+uuid.uuid4().hex))
 
     execution_started_at = datetime.datetime.now()
     days_back, normalized_filter = _days_back_from_filter(time_filter, reference_dt=execution_started_at)
@@ -3882,7 +3908,7 @@ def run_post_crq_audit(
         "enable_auto_throttle": scheduler_config.enable_auto_throttle,
     }
 
-    executed_checks: List[Dict[str, Any]] = []
+    executed_checks: List[Dict[str, Any]] = list(capability_skips)
     errors: List[Dict[str, Any]] = []
     source_file = os.path.basename(path)
     run_started = time.perf_counter()
@@ -3900,9 +3926,9 @@ def run_post_crq_audit(
         "category_distribution": {"heavy": 0, "medium": 0, "light": 0},
     }
 
-    if can_parallelize and len(selected_ids) > 1 and scheduler_config.max_concurrency_global > 1:
+    if can_parallelize and len(execution_ids) > 1 and scheduler_config.max_concurrency_global > 1:
         scheduled_tasks: List[SchedulerTask] = []
-        for index, check_id in enumerate(selected_ids):
+        for index, check_id in enumerate(execution_ids):
             check = lookup[check_id]
             category = classify_check_category(check_id, check.get("sql") or "")
             scheduled_tasks.append(
@@ -3936,10 +3962,10 @@ def run_post_crq_audit(
                 worker_dbm.close()
 
         scheduler_run = run_scheduled_tasks(scheduled_tasks, execute_task, scheduler_config)
-        executed_checks = scheduler_run["results"]
+        executed_checks.extend(scheduler_run["results"])
         scheduler_metrics = scheduler_run["metrics"]
     else:
-        for check_id in selected_ids:
+        for check_id in execution_ids:
             category = classify_check_category(check_id, lookup[check_id].get("sql") or "")
             item = _run_single_post_crq_check(
                 lookup[check_id],
@@ -4060,16 +4086,17 @@ def run_post_crq_audit(
         executed_checks=executed_checks,
     )
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    rule_definitions = {
-        item["check_id"]: definition_from_post_crq(
-            item, timeout=timeout_for_category(scheduler_config, classify_check_category(item["check_id"], item.get("sql") or ""))
-        ) for item in available_checks
-    }
     # `profile` is the existing stable, user-visible target label. It is deliberately
     # not derived from a DSN, which could expose credentials in finding identity.
     rule_results = [result_from_post_crq(item, str(profile), rule_definitions[item["check_id"]]).to_dict() for item in executed_checks]
     return {
         "audit_type": "post_crq",
+        "audit_run_id":audit_run_id,
+        "trigger_type":str(audit_context.get("trigger_type") or "MANUAL").upper(),
+        "trigger_reference":str(audit_context.get("trigger_reference") or ""),
+        "runtime_identity":runtime_identity(),
+        "rule_pack_identity":rule_pack_id,
+        "capability_snapshot":capability_snapshot,
         "report_options": {
             "include_annex": True,
         },

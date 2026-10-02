@@ -152,6 +152,7 @@ export default function usePostCrqAudit({
       selected_checks: selectedChecksForRun,
       criticality_overrides: criticalityOverridesForRun,
       scheduler_options: schedulerOptionsForRun,
+      audit_run_id: `AUD-MAN-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`}`,
     })
       .then((res) => {
         setPostCrqReportData(res);

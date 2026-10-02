@@ -75,6 +75,7 @@ test('usePostCrqAudit runs the audit with normalized payload and stores the resu
 
   await waitFor(() => {
     expect(runPostCrqAudit).toHaveBeenCalledWith({
+      audit_run_id: expect.stringMatching(/^AUD-MAN-/),
       profile: 'E13DB',
       schemas: ['SCH1', 'SCH2'],
       time_filter: { mode: 'relative', days_back: 14 },

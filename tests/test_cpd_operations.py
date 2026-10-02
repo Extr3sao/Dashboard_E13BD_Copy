@@ -396,7 +396,7 @@ def test_accelerated_soak_and_cpd_failure_recovery(runtime, monkeypatch):
             runtime.alerts.findings.reconcile("SMTP-DOWN", [result("SMTP-DOWN")], audit_run_id="smtp-down", observed_at=now[0])
             runtime.alerts.evaluate("SMTP-DOWN", now=now[0])
             with runtime._connect() as conn:
-                assert conn.execute("SELECT COUNT(*) FROM alert_deliveries WHERE status='FAILED'").fetchone()[0] > 0
+                assert conn.execute("SELECT COUNT(*) FROM alert_deliveries WHERE status IN ('FAILED','AMBIGUOUS')").fetchone()[0] > 0
             assert runtime.refresh()["components"]["Notification Engine"]["status"] == "DEGRADED"
         if day == 4:
             abandoned = runtime.automation.create_run(jobs[0]["id"])

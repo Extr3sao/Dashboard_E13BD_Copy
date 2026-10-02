@@ -107,9 +107,17 @@ class FindingStore:
             );
             CREATE INDEX IF NOT EXISTS idx_audit_runs_target_time ON audit_runs(database_id, completed_at DESC);
             CREATE TABLE IF NOT EXISTS finding_reconciliation_receipts (
-              audit_run_id TEXT PRIMARY KEY, database_id TEXT NOT NULL, observed_at REAL NOT NULL
+              audit_run_id TEXT PRIMARY KEY, database_id TEXT NOT NULL, observed_at REAL NOT NULL,
+              status TEXT NOT NULL DEFAULT 'PENDING'
+            );
+            CREATE TABLE IF NOT EXISTS red_flag_observations (
+              dedupe_key TEXT NOT NULL, audit_run_id TEXT NOT NULL, observed_at REAL NOT NULL,
+              PRIMARY KEY(dedupe_key,audit_run_id)
             );
             """)
+            receipt_columns={row[1] for row in conn.execute("PRAGMA table_info(finding_reconciliation_receipts)")}
+            if "status" not in receipt_columns:
+                conn.execute("ALTER TABLE finding_reconciliation_receipts ADD COLUMN status TEXT NOT NULL DEFAULT 'COMPLETED'")
 
     def set_target_context(self, database_id: str, *, environment: str = "development", criticality: str = "medium", owner: str = "", tags: Iterable[str] = ()) -> None:
         now = time.time()
@@ -138,28 +146,47 @@ class FindingStore:
             self.set_target_context(database_id, **target_context)
         results = [dict(item) for item in rule_results]
         if _normalized(audit_state) != "SUCCESS":
-            self._upsert_run_health(database_id, "AUDIT_EXECUTION_FAILURE", now, "Audit execution did not complete; existing findings were not resolved.")
+            with self._connect() as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                receipt=conn.execute("SELECT database_id,status FROM finding_reconciliation_receipts WHERE audit_run_id=?",(run_id,)).fetchone()
+                if receipt and receipt[0]!=database_id: raise ValueError("audit_run_target_mismatch")
+                if receipt and receipt[1]=="COMPLETED":
+                    conn.commit()
+                    self._record_audit(run_id,database_id,results,audit_state,now,coverage_valid=False)
+                    return {"audit_run_id":run_id,"findings":self.summary(database_id),"red_flags":self.list_red_flags(database_id=database_id),"coverage_valid":False}
+                if receipt and receipt[1]=="FAILED":
+                    conn.execute("UPDATE finding_reconciliation_receipts SET observed_at=?,status='PENDING' WHERE audit_run_id=?",(now,run_id))
+                else:
+                    conn.execute("INSERT OR IGNORE INTO finding_reconciliation_receipts(audit_run_id,database_id,observed_at,status) VALUES(?,?,?,'PENDING')",(run_id,database_id,now))
+            self._upsert_run_health(database_id, "AUDIT_EXECUTION_FAILURE", now, "Audit execution did not complete; existing findings were not resolved.", audit_run_id=run_id)
             self._record_audit(run_id, database_id, results, audit_state, now, coverage_valid=False)
+            with self._connect() as conn:
+                conn.execute("UPDATE finding_reconciliation_receipts SET status='FAILED',observed_at=? WHERE audit_run_id=? AND status!='COMPLETED'",(now,run_id))
             self._refresh_investigations(database_id, now)
             return {"audit_run_id": run_id, "findings": self.summary(database_id), "red_flags": self.list_red_flags(database_id=database_id), "coverage_valid": False}
         evaluated = {_text(item.get("rule_id")) for item in results if _normalized(item.get("status")) in VALID_STATUSES}
         if any(_normalized(item.get("status")) in {"ERROR", "SKIPPED"} for item in results):
-            self._upsert_run_health(database_id, "COVERAGE_DEGRADED", now, "One or more rules were not evaluated successfully; absent findings were retained.")
+            self._upsert_run_health(database_id, "COVERAGE_DEGRADED", now, "One or more rules were not evaluated successfully; absent findings were retained.", audit_run_id=run_id)
         candidates = [item for item in (self._candidate(result) for result in results) if item]
         seen: set[str] = set()
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
-            receipt = conn.execute("SELECT database_id FROM finding_reconciliation_receipts WHERE audit_run_id=?", (run_id,)).fetchone()
-            if receipt:
+            receipt = conn.execute("SELECT database_id,status FROM finding_reconciliation_receipts WHERE audit_run_id=?", (run_id,)).fetchone()
+            if receipt and receipt[1]=="COMPLETED":
                 if receipt[0] != database_id:
                     raise ValueError("audit_run_target_mismatch")
                 # Repair projections after a crash between committed reconciliation
                 # and projection publication without counting observations twice.
                 conn.commit()
-                self._refresh_red_flags(database_id, now)
+                self._refresh_red_flags(database_id, now, run_id)
                 self._record_audit(run_id, database_id, results, audit_state, now, coverage_valid=bool(evaluated))
                 self._refresh_investigations(database_id, now)
                 return {"audit_run_id": run_id, "findings": self.summary(database_id), "red_flags": self.list_red_flags(database_id=database_id), "coverage_valid": bool(evaluated)}
+            if receipt and receipt[0]!=database_id: raise ValueError("audit_run_target_mismatch")
+            if receipt and receipt[1]=="FAILED":
+                conn.execute("UPDATE finding_reconciliation_receipts SET observed_at=?,status='PENDING' WHERE audit_run_id=?",(now,run_id))
+            else:
+                conn.execute("INSERT OR IGNORE INTO finding_reconciliation_receipts(audit_run_id,database_id,observed_at,status) VALUES(?,?,?,'PENDING')",(run_id,database_id,now))
             for candidate in candidates:
                 candidate["database_id"] = candidate["database_id"] or database_id
                 fingerprint = finding_fingerprint(candidate["database_id"], candidate["rule_id"], candidate["object_type"], candidate["owner"], candidate["object_name"])
@@ -187,8 +214,10 @@ class FindingStore:
                     if fingerprint not in seen:
                         conn.execute("UPDATE findings SET status='RESOLVED',delta='RESOLVED',last_seen=?,updated_at=? WHERE id=?", (now, now, finding_id))
                         conn.execute("INSERT OR IGNORE INTO finding_occurrences(finding_id,audit_run_id,observed_at,severity,value,delta,summary,evidence) SELECT id,?,?,?,?,?,?,? FROM findings WHERE id=?", (run_id, now, "LOW", None, "RESOLVED", "Rule passed in a successfully evaluated scope.", "{}", finding_id))
-            conn.execute("INSERT INTO finding_reconciliation_receipts VALUES(?,?,?)", (run_id, database_id, now))
-        self._refresh_red_flags(database_id, now)
+            if evaluated and not any(_normalized(item.get("status")) in {"ERROR","SKIPPED"} for item in results):
+                conn.execute("UPDATE red_flags SET status='RESOLVED',updated_at=? WHERE database_id=? AND finding_id IS NULL AND flag_type IN ('AUDIT_EXECUTION_FAILURE','DATABASE_UNREACHABLE','COVERAGE_DEGRADED') AND status='OPEN'",(now,database_id))
+            conn.execute("UPDATE finding_reconciliation_receipts SET observed_at=?,status='COMPLETED' WHERE audit_run_id=?", (now,run_id))
+        self._refresh_red_flags(database_id, now, run_id)
         self._record_audit(run_id, database_id, results, audit_state, now, coverage_valid=bool(evaluated))
         self._refresh_investigations(database_id, now)
         return {"audit_run_id": run_id, "findings": self.summary(database_id), "red_flags": self.list_red_flags(database_id=database_id), "coverage_valid": bool(evaluated)}
@@ -200,7 +229,7 @@ class FindingStore:
         coverage = "FULL" if total and evaluated == total else ("PARTIAL" if evaluated else "UNKNOWN")
         if counts.get("ERROR", 0) or counts.get("SKIPPED", 0): coverage = "DEGRADED" if evaluated == 0 else "PARTIAL"
         with self._connect() as conn:
-            conn.execute("INSERT OR REPLACE INTO audit_runs(audit_run_id,database_id,state,started_at,completed_at,checks_total,checks_pass,checks_warn,checks_fail,checks_error,checks_skipped,coverage_state,coverage_ratio,error_summary) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (run_id, database_id, _normalized(state), now, now, total, counts.get("PASS", 0), counts.get("WARN", 0), counts.get("FAIL", 0), counts.get("ERROR", 0), counts.get("SKIPPED", 0), coverage, (evaluated / total) if total else None, None))
+            conn.execute("INSERT INTO audit_runs(audit_run_id,database_id,state,started_at,completed_at,checks_total,checks_pass,checks_warn,checks_fail,checks_error,checks_skipped,coverage_state,coverage_ratio,error_summary) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(audit_run_id) DO UPDATE SET database_id=excluded.database_id,state=excluded.state,completed_at=excluded.completed_at,checks_total=excluded.checks_total,checks_pass=excluded.checks_pass,checks_warn=excluded.checks_warn,checks_fail=excluded.checks_fail,checks_error=excluded.checks_error,checks_skipped=excluded.checks_skipped,coverage_state=excluded.coverage_state,coverage_ratio=excluded.coverage_ratio,error_summary=excluded.error_summary", (run_id, database_id, _normalized(state), now, now, total, counts.get("PASS", 0), counts.get("WARN", 0), counts.get("FAIL", 0), counts.get("ERROR", 0), counts.get("SKIPPED", 0), coverage, (evaluated / total) if total else None, None))
 
     def _latest_audit(self, database_id: str) -> dict[str, Any] | None:
         rows = self._rows("SELECT * FROM audit_runs WHERE database_id=? ORDER BY completed_at DESC LIMIT 1", (database_id,))
@@ -260,7 +289,7 @@ class FindingStore:
         rows = self._rows("SELECT * FROM audit_runs WHERE " + where + " ORDER BY completed_at", args)
         return [{"at": row["completed_at"], "active_findings": len(self.list_findings(database=row["database_id"])), "critical_findings": sum(item["severity"] == "CRITICAL" for item in self.list_findings(database=row["database_id"])), "red_flags": len(self.list_red_flags(database_id=row["database_id"])), "unreachable": int(row["state"] != "SUCCESS"), "failed_audits": int(row["state"] != "SUCCESS"), "coverage": row["coverage_ratio"]} for row in rows]
 
-    def reconcile_post_crq(self, report: dict[str, Any], *, target_context: dict[str, Any] | None = None) -> dict[str, Any]:
+    def reconcile_post_crq(self, report: dict[str, Any], *, target_context: dict[str, Any] | None = None, audit_run_id: str | None = None) -> dict[str, Any]:
         """Use bounded row envelopes when Post-CRQ can identify the affected object."""
         database_id = _text((report.get("context") or {}).get("profile"))
         by_rule = {item.get("rule_id"): item for item in report.get("rule_results") or []}
@@ -278,7 +307,7 @@ class FindingStore:
         # prior object-level findings. A failed rule without a usable object stays rule-level.
         covered = {item.get("rule_id") for item in expanded}
         expanded.extend(item for item in by_rule.values() if _normalized(item.get("status")) == "PASS" or item.get("rule_id") not in covered)
-        return self.reconcile(database_id, expanded, target_context=target_context)
+        return self.reconcile(database_id, expanded, audit_run_id=audit_run_id or report.get("audit_run_id"), target_context=target_context)
 
     @staticmethod
     def _evolution(previous: Any, current: Any, direction: str) -> str:
@@ -301,7 +330,7 @@ class FindingStore:
         if finding["delta"] in {"NEW", "WORSENING", "REOPENED"} or finding["severity"] == "MEDIUM": return "P3", reasons
         return "P4", reasons
 
-    def _refresh_red_flags(self, database_id: str, now: float) -> None:
+    def _refresh_red_flags(self, database_id: str, now: float, audit_run_id: str) -> None:
         with self._connect() as conn:
             context = self._context(conn, database_id)
             rows = conn.execute("SELECT * FROM findings WHERE database_id=? AND status IN ('OPEN','ACKNOWLEDGED','ACCEPTED_RISK','FALSE_POSITIVE')", (database_id,)).fetchall()
@@ -318,21 +347,28 @@ class FindingStore:
                 explanation = "; ".join(reasons)
                 existing = conn.execute("SELECT id,occurrences FROM red_flags WHERE dedupe_key=?", (key,)).fetchone()
                 if existing:
-                    conn.execute("UPDATE red_flags SET priority=?,status='OPEN',explanation=?,recommendation=?,last_seen=?,occurrences=?,updated_at=? WHERE id=?", (priority, explanation, finding["recommendation"], now, existing[1] + 1, now, existing[0]))
+                    observation=conn.execute("INSERT OR IGNORE INTO red_flag_observations(dedupe_key,audit_run_id,observed_at) VALUES(?,?,?)",(key,audit_run_id,now))
+                    increments=1 if observation.rowcount else 0
+                    conn.execute("UPDATE red_flags SET priority=?,status='OPEN',explanation=?,recommendation=?,last_seen=?,occurrences=?,updated_at=? WHERE id=?", (priority, explanation, finding["recommendation"], now, existing[1] + increments, now, existing[0]))
                 else:
                     conn.execute("INSERT INTO red_flags(dedupe_key,finding_id,database_id,flag_type,priority,status,explanation,recommendation,first_seen,last_seen,occurrences,created_at,updated_at) VALUES(?,?,?,?,?,'OPEN',?,?,?,?,1,?,?)", (key, finding["id"], database_id, flag_type, priority, explanation, finding["recommendation"], now, now, now, now))
+                    conn.execute("INSERT OR IGNORE INTO red_flag_observations(dedupe_key,audit_run_id,observed_at) VALUES(?,?,?)",(key,audit_run_id,now))
             if desired:
                 placeholders = ",".join("?" for _ in desired)
                 conn.execute(f"UPDATE red_flags SET status='RESOLVED',updated_at=? WHERE database_id=? AND finding_id IS NOT NULL AND dedupe_key NOT IN ({placeholders})", (now, database_id, *desired))
             else:
                 conn.execute("UPDATE red_flags SET status='RESOLVED',updated_at=? WHERE database_id=? AND finding_id IS NOT NULL", (now, database_id))
 
-    def _upsert_run_health(self, database_id: str, flag_type: str, now: float, explanation: str) -> None:
+    def _upsert_run_health(self, database_id: str, flag_type: str, now: float, explanation: str, *, audit_run_id: str) -> None:
         key = f"{flag_type}:{database_id}";
         with self._connect() as conn:
             old = conn.execute("SELECT id,occurrences FROM red_flags WHERE dedupe_key=?", (key,)).fetchone()
-            if old: conn.execute("UPDATE red_flags SET last_seen=?,occurrences=?,status='OPEN',updated_at=? WHERE id=?", (now, old[1] + 1, now, old[0]))
-            else: conn.execute("INSERT INTO red_flags(dedupe_key,database_id,flag_type,priority,status,explanation,first_seen,last_seen,occurrences,created_at,updated_at) VALUES(?,?,?,'P1','OPEN',?,?,?,1,?,?)", (key, database_id, flag_type, explanation, now, now, now, now))
+            observation=conn.execute("INSERT OR IGNORE INTO red_flag_observations(dedupe_key,audit_run_id,observed_at) VALUES(?,?,?)",(key,audit_run_id,now))
+            if old:
+                increments=1 if observation.rowcount else 0
+                conn.execute("UPDATE red_flags SET last_seen=?,occurrences=?,status='OPEN',updated_at=? WHERE id=?", (now, old[1] + increments, now, old[0]))
+            else:
+                conn.execute("INSERT INTO red_flags(dedupe_key,database_id,flag_type,priority,status,explanation,first_seen,last_seen,occurrences,created_at,updated_at) VALUES(?,?,?,'P1','OPEN',?,?,?,1,?,?)", (key, database_id, flag_type, explanation, now, now, now, now))
 
     def action(self, finding_id: int, action: str, actor: str, reason: str, review_date: str | None = None) -> dict[str, Any]:
         status = _normalized(action)

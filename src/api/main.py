@@ -77,6 +77,7 @@ from src.api.cpd_operations import OperationsRuntime, OperationsConfig
 from src.api.cpd_router import create_cpd_router
 from src.api.investigation_engine import InvestigationStore
 from src.api.investigations_router import create_investigations_router
+from src.api.audit_evidence import AuditEvidenceService
 
 
 SCHEMA_NAME_PATTERN = re.compile(r"^[A-Z][A-Z0-9_$#]*$")
@@ -104,10 +105,13 @@ except Exception:
 scoring_engine = ScoringEngine()
 automation_service = AutomationService(automation_store, config_loader)
 alerting_service = AlertingService(finding_store, automation_service)
+audit_evidence_service = AuditEvidenceService(internal_db, finding_store, alerting_service)
+automation_service.audit_evidence_service = audit_evidence_service
 investigation_store = InvestigationStore(finding_store)
 finding_store.investigation_service = investigation_store
 automation_service.set_operational_maintenance_hook(alerting_service.run_scheduled_reports)
 operations_runtime = OperationsRuntime(internal_db, automation_store, automation_service, alerting_service, operations_config)
+operations_runtime.audit_evidence_service = audit_evidence_service
 automation_service.operations_runtime = operations_runtime
 automation_service.set_operational_maintenance_hook(operations_runtime.maintenance)
 
@@ -413,6 +417,28 @@ def _resolve_post_crq_report_payload(payload: Dict) -> tuple[str, Dict[str, Any]
 
     dbm = OracleDBManager(profiles[selected_profile])
     try:
+        report = _run_post_crq_with_evidence(dbm, selected_profile, payload)
+    finally:
+        dbm.close()
+
+    return selected_profile, report, False
+
+
+def _run_post_crq_with_evidence(dbm, selected_profile, payload: Dict) -> Dict[str, Any]:
+    profile = selected_profile or payload.get("profile") or "UNKNOWN"
+    audit_run_id = str(payload.get("audit_run_id") or ("AUD-MAN-" + uuid.uuid4().hex))
+    trigger_reference = str(payload.get("trigger_reference") or "manual_api")
+    attempt = audit_evidence_service.begin(
+        audit_run_id, profile, trigger_type="MANUAL", trigger_reference=trigger_reference,
+        target_context=payload.get("target_context"),
+    )
+    if attempt.get("already_reconciled"):
+        return audit_evidence_service.replay_result(audit_run_id)
+    if attempt.get("needs_reconciliation"):
+        audit_evidence_service.reconcile(audit_run_id)
+        return audit_evidence_service.replay_result(audit_run_id)
+    persisted = False
+    try:
         report = run_post_crq_audit(
             db_manager=dbm,
             selected_checks=payload.get("selected_checks") or [],
@@ -421,11 +447,26 @@ def _resolve_post_crq_report_payload(payload: Dict) -> tuple[str, Dict[str, Any]
             profile=selected_profile,
             criticality_overrides=payload.get("criticality_overrides") or {},
             scheduler_options=payload.get("scheduler_options") or {},
+            audit_context={"audit_run_id":audit_run_id,"trigger_type":"MANUAL","trigger_reference":trigger_reference},
         )
-    finally:
-        dbm.close()
-
-    return selected_profile, report, False
+        persisted_evidence = audit_evidence_service.persist_completed(
+            audit_run_id, attempt["attempt_no"], report, target_context=payload.get("target_context"),
+        )
+        persisted = True
+        operational = audit_evidence_service.reconcile(audit_run_id)
+        report["operational_summary"] = operational.get("findings")
+        report["red_flags"] = operational.get("red_flags")
+        report["audit_run_id"] = audit_run_id
+        report["reconciliation_state"] = operational.get("reconciliation_state")
+        report["capability_snapshot_hash"] = persisted_evidence.get("capability_snapshot_hash")
+        report["rule_pack_identity"] = persisted_evidence.get("rule_pack_identity")
+        report["coverage_state"] = persisted_evidence.get("coverage_state")
+        return report
+    except Exception as exc:
+        if not persisted:
+            from src.api.audit_evidence import classify_failure
+            audit_evidence_service.fail(audit_run_id, attempt["attempt_no"], classify_failure(exc), str(exc))
+        raise
 
 
 def _normalize_post_crq_criticality_overrides(raw_overrides: Any) -> Dict[str, str]:
@@ -1035,32 +1076,24 @@ async def list_post_crq_checks():
 async def run_post_crq(payload: Dict = Body(...)):
     """Executa una auditoria tecnica post-CRQ basada en checks del markdown."""
     async def operation(selected_profile, dbm):
-        profile = payload.get("profile")
-        schemas = payload.get("schemas") or []
-        time_filter = payload.get("time_filter") or {}
-        selected_checks = payload.get("selected_checks") or []
-        criticality_overrides = payload.get("criticality_overrides") or {}
-        scheduler_options = payload.get("scheduler_options") or {}
-
-        report = run_post_crq_audit(
-            db_manager=dbm,
-            selected_checks=selected_checks,
-            schemas=schemas,
-            time_filter=time_filter,
-            profile=selected_profile,
-            criticality_overrides=criticality_overrides,
-            scheduler_options=scheduler_options,
-        )
-        # Findings are reconciled only after the legacy audit completed and emitted
-        # normalized results; a failed connection never implies a resolution.
-        operational = finding_store.reconcile_post_crq(report, target_context=payload.get("target_context") or {})
-        operational["alerts"] = alerting_service.evaluate((report.get("context") or {}).get("profile", ""))
-        report["operational_summary"] = operational["findings"]
-        report["red_flags"] = operational["red_flags"]
-        report["audit_run_id"] = operational["audit_run_id"]
-        return report
+        return _run_post_crq_with_evidence(dbm, selected_profile, payload)
 
     return await _run_with_oracle_profile("run_post_crq", payload.get("profile"), operation)
+
+
+@app.get("/api/audit-runs")
+def list_audit_runs(database_id: Optional[str] = None, status: Optional[str] = None, trigger_type: Optional[str] = None, limit: int = 50, offset: int = 0):
+    return _run_with_internal_http_error("list_audit_runs", lambda: audit_evidence_service.list_audits(database_id=database_id, status=status, trigger_type=trigger_type, limit=limit, offset=offset))
+
+
+@app.get("/api/audit-runs/{audit_run_id}")
+def get_audit_run(audit_run_id: str):
+    def operation():
+        try:
+            return audit_evidence_service.audit_detail(audit_run_id)
+        except KeyError:
+            raise HTTPException(status_code=404, detail="Audit run not found")
+    return _run_with_internal_http_error("get_audit_run", operation)
 
 
 @app.post("/api/audit/post-crq/generate-by-lots")
@@ -1076,15 +1109,7 @@ async def generate_post_crq_by_lots(payload: Dict = Body(...)):
         scheduler_options = payload.get("scheduler_options") or {}
 
         # 1. Executar l'auditoria una sola vegada (Model Global)
-        report = run_post_crq_audit(
-            db_manager=dbm,
-            selected_checks=selected_checks,
-            schemas=schemas,
-            time_filter=time_filter,
-            profile=selected_profile,
-            criticality_overrides=criticality_overrides,
-            scheduler_options=scheduler_options,
-        )
+        report = _run_post_crq_with_evidence(dbm, selected_profile, payload)
         
         # 2. Generar el ZIP mitjançant la nova funció
         zip_bytes = build_post_crq_zip_bundle(selected_profile, report)

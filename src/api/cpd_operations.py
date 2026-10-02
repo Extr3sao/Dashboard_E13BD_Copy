@@ -63,6 +63,7 @@ class OperationsRuntime:
         self._lease_stop = threading.Event()
         self._lease_thread = None
         self._last_maintenance_failure = None
+        self.audit_evidence_service = None
 
     def _connect(self):
         return self.internal._get_connection()
@@ -143,6 +144,10 @@ class OperationsRuntime:
                 self._lease_stop.clear()
                 self._lease_thread = threading.Thread(target=self._renew_loop, name="operations-lease", daemon=True)
                 self._lease_thread.start()
+            elif self.audit_evidence_service:
+                # Projection recovery is safe under concurrent retries because
+                # each AuditRun and Finding reconciliation is receipt-idempotent.
+                self.audit_evidence_service.recover_pending_reconciliations()
             self.startup_steps.extend(["recover_interrupted_work", "acquire_scheduler_ownership"])
             if scheduler_enabled:
                 self.scheduler.start()
@@ -199,6 +204,8 @@ class OperationsRuntime:
     def recover(self):
         # Ownership has expired before this method: all runs from the previous sole
         # scheduler are abandoned, even when they are younger than ten minutes.
+        if self.audit_evidence_service:
+            self.audit_evidence_service.recover_interrupted_runs(now=self.clock(),stale_after_seconds=0)
         with self.automation._get_connection() as conn:
             count = conn.execute("UPDATE job_runs SET status='interrupted',finished_at=datetime('now'),error_message='process_recovery' WHERE status='running'").rowcount
         with self._connect() as conn:
@@ -206,6 +213,8 @@ class OperationsRuntime:
             tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             if "audit_execution_leases" in tables:
                 conn.execute("UPDATE audit_execution_leases SET state='INTERRUPTED',expires_at=? WHERE state='RUNNING' AND expires_at<=?", (self.clock(), self.clock()))
+        if self.audit_evidence_service:
+            self.audit_evidence_service.recover_pending_reconciliations()
         if count:
             self.event("Audit Engine", "work_recovered", "DEGRADED", f"Recovered {count} interrupted audits; completed audits were preserved.")
 
@@ -331,6 +340,7 @@ class OperationsRuntime:
             ("red_flags", "updated_at", "alerts", "status='RESOLVED' AND (finding_id IS NULL OR finding_id IN (SELECT id FROM findings WHERE status='RESOLVED'))"),
             ("alert_events", "updated_at", "alerts", "status IN ('CLOSED','RECOVERED') AND actor IS NULL AND id NOT IN (SELECT alert_id FROM alert_deliveries)"),
             ("alert_deliveries", "attempted_at", "delivery_history", "alert_id IN (SELECT id FROM alert_events WHERE status IN ('CLOSED','RECOVERED'))"),
+            ("notification_outbox", "created_at", "delivery_history", "target_type='ALERT' AND target_id IN (SELECT id FROM alert_events WHERE status IN ('CLOSED','RECOVERED')) AND status IN ('SENT','FAILED','AMBIGUOUS')"),
             ("operational_reports", "generated_at", "reports", "COALESCE(delivered_at,0)<?"),
             ("operations_events", "created_at", "operational_metrics", "1=1"),
             ("operations_backups", "created_at", "operational_metrics", "status IN ('FAILED','EXPIRED')"),
@@ -445,12 +455,12 @@ class OperationsRuntime:
             delivery_tail = self._rows(conn, "SELECT status,attempted_at FROM (SELECT status,attempted_at,id AS sequence FROM alert_deliveries UNION ALL SELECT CASE WHEN delivery_status='SENT' THEN 'SENT' ELSE 'FAILED' END,delivered_at,id AS sequence FROM operational_reports WHERE delivered_at IS NOT NULL) ORDER BY attempted_at DESC,sequence DESC LIMIT 20")
             consecutive_delivery_failures = 0
             for delivery in delivery_tail:
-                if delivery["status"] != "FAILED":
+                if delivery["status"] not in {"FAILED","AMBIGUOUS"}:
                     break
                 consecutive_delivery_failures += 1
             if delivery_tail:
                 deliveries = [delivery_tail[0]]
-        smtp_failed = bool(deliveries and deliveries[0]["status"] == "FAILED")
+        smtp_failed = bool(deliveries and deliveries[0]["status"] in {"FAILED","AMBIGUOUS"})
         try:
             current_smtp = self.scheduler._delivery_config()
             smtp_invalid = not (current_smtp.get("smtp_host") and current_smtp.get("from_email") and current_smtp.get("default_recipients"))

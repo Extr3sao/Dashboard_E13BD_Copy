@@ -215,6 +215,7 @@ class AutomationService:
         self._thread: Optional[threading.Thread] = None
         self._operational_maintenance_hook = None
         self.operations_runtime = None
+        self.audit_evidence_service = None
 
     def set_operational_maintenance_hook(self, hook) -> None:
         """Use the existing scheduler tick for bounded operational side work."""
@@ -355,18 +356,61 @@ class AutomationService:
             raise ValueError(f"Job {job_id} no trobat")
 
         start = utc_now()
-        run_id = self.store.create_run(job_id, started_at=iso_utc(start))
+        audit_type = (job.get("audit_type") or "").lower()
+        evidence_enabled = bool(self.audit_evidence_service and audit_type in {"post_crq", "post_crq_distribution"})
+        audit_run_id = None
+        if evidence_enabled:
+            if manual:
+                audit_run_id = "AUD-MAN-" + uuid.uuid4().hex
+            else:
+                audit_run_id = self.audit_evidence_service.scheduled_identity(job_id, scheduled_reference or job.get("next_run_at") or iso_utc(start))
+        run_id = self.store.create_run(job_id, started_at=iso_utc(start), audit_run_id=audit_run_id)
         report_path = None
         report_data = None
         deliveries: List[Dict[str, Any]] = []
         created_tasks: List[Dict[str, Any]] = []
         lot_execution: Optional[Dict[str, Any]] = None
         analytics_persisted = False
+        audit_evidence_started = False
+        audit_evidence_completed = False
 
         try:
+            if evidence_enabled:
+                config = job.get("job_config") or {}
+                target_context = config.get("target_context") or {}
+                trigger_reference = f"job:{job_id}:run:{run_id}" if manual else f"job:{job_id}:scheduled:{scheduled_reference or job.get('next_run_at') or iso_utc(start)}"
+                evidence_attempt = self.audit_evidence_service.begin(
+                    audit_run_id, job["profile"], trigger_type="MANUAL" if manual else "SCHEDULED",
+                    trigger_reference=trigger_reference, target_context=target_context,
+                )
+                audit_evidence_started = True
+                if evidence_attempt.get("already_reconciled"):
+                    self.store.complete_run(run_id, status="success", summary={"audit_run_id": audit_run_id, "replayed": True})
+                    if not manual:
+                        self.store.touch_job_schedule(job_id, next_run_at=self._next_operational_run(job, scheduled_reference), last_run_at=iso_utc(utc_now()))
+                    return self.store.get_run(run_id)
+                if evidence_attempt.get("needs_reconciliation"):
+                    self.audit_evidence_service.reconcile(audit_run_id)
+                    audit_evidence_completed = True
+                    self.store.complete_run(run_id, status="success", summary={"audit_run_id": audit_run_id, "reconciled_after_retry": True})
+                    if not manual:
+                        self.store.touch_job_schedule(job_id, next_run_at=self._next_operational_run(job, scheduled_reference), last_run_at=iso_utc(utc_now()))
+                    return self.store.get_run(run_id)
+                job["_e13db_audit_context"] = {"audit_run_id": audit_run_id, "trigger_type": "MANUAL" if manual else "SCHEDULED", "trigger_reference": trigger_reference}
             report_data = self._run_audit(job)
-            if self._stop_event.is_set():
+            if self._stop_event.is_set() and not evidence_enabled:
                 self.store.complete_run(run_id, status="interrupted", error_message="shutdown_requested")
+                return self.store.get_run(run_id)
+            if evidence_enabled and isinstance(report_data, dict):
+                target_context = (job.get("job_config") or {}).get("target_context") or {}
+                persisted_evidence = self.audit_evidence_service.persist_completed(
+                    audit_run_id, evidence_attempt["attempt_no"], report_data, target_context=target_context,
+                )
+                audit_evidence_completed = True
+                reconciled = self.audit_evidence_service.reconcile(audit_run_id)
+                report_data = {**report_data, "operational_summary": reconciled.get("findings"), "red_flags": reconciled.get("red_flags"), "audit_run_id": audit_run_id, "capability_snapshot_hash": persisted_evidence.get("capability_snapshot_hash"), "rule_pack_identity": persisted_evidence.get("rule_pack_identity"), "coverage_state": persisted_evidence.get("coverage_state"), "reconciliation_state": reconciled.get("reconciliation_state")}
+            if self._stop_event.is_set():
+                self.store.complete_run(run_id, status="interrupted", error_message="shutdown_requested", summary={"audit_run_id": audit_run_id} if audit_run_id else {})
                 return self.store.get_run(run_id)
             if (job.get("audit_type") or "").lower() == "post_crq_distribution":
                 lot_execution = self._build_distribution_execution(job, report_data)
@@ -389,6 +433,8 @@ class AutomationService:
                         **summary,
                         "lot_execution": lot_execution.get("summary") or {},
                     }
+                if audit_run_id:
+                    summary = {**(summary if isinstance(summary,dict) else {}),"audit_run_id":audit_run_id}
                 self.store.complete_run(
                     run_id,
                     status="error",
@@ -432,6 +478,8 @@ class AutomationService:
                     **summary,
                     "lot_execution": lot_execution.get("summary") or {},
                 }
+            if audit_run_id:
+                summary = {**(summary if isinstance(summary,dict) else {}),"audit_run_id":audit_run_id}
             self.store.complete_run(
                 run_id,
                 status=status,
@@ -468,6 +516,12 @@ class AutomationService:
             )
             duration_ms = int((utc_now() - start).total_seconds() * 1000)
             failure_message = self._build_failure_reason_from_exception(exc)
+            if evidence_enabled and audit_evidence_started and not audit_evidence_completed:
+                try:
+                    from src.api.audit_evidence import classify_failure
+                    self.audit_evidence_service.fail(audit_run_id, evidence_attempt["attempt_no"], classify_failure(exc), failure_message)
+                except Exception:
+                    logger.error("audit_evidence_failure_record_failed", extra={"job_id": job_id, "reason": "audit_receipt_unavailable"})
             if lot_execution:
                 self._mark_lot_execution_generation_failure(lot_execution, {"message": failure_message})
             deliveries.extend(
@@ -498,7 +552,7 @@ class AutomationService:
                 run_id,
                 status="error",
                 duration_ms=duration_ms,
-                summary={},
+                summary={"audit_run_id":audit_run_id} if audit_run_id else {},
                 error_message=failure_message,
                 report_path=report_path,
                 deliveries=deliveries,
@@ -692,6 +746,7 @@ class AutomationService:
                     profile=params["PROFILE_NAME"],
                     criticality_overrides=job.get("criticality_overrides") or {},
                     scheduler_options=job.get("scheduler_options") or {},
+                    audit_context=job.get("_e13db_audit_context") or {},
                 )
             finally:
                 dbm.close()

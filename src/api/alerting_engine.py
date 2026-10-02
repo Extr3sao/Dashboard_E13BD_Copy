@@ -47,11 +47,21 @@ class AlertingService:
             CREATE INDEX IF NOT EXISTS idx_alert_deliveries_alert ON alert_deliveries(alert_id, attempted_at DESC);
             CREATE TABLE IF NOT EXISTS maintenance_windows (id INTEGER PRIMARY KEY AUTOINCREMENT, database_id TEXT NOT NULL, starts_at REAL NOT NULL, ends_at REAL NOT NULL, reason TEXT NOT NULL, created_by TEXT NOT NULL, created_at REAL NOT NULL);
             CREATE INDEX IF NOT EXISTS idx_maintenance_window ON maintenance_windows(database_id, starts_at, ends_at);
-            CREATE TABLE IF NOT EXISTS operational_reports (id INTEGER PRIMARY KEY AUTOINCREMENT, report_type TEXT NOT NULL, period_start REAL NOT NULL, period_end REAL NOT NULL, generated_at REAL NOT NULL, status TEXT NOT NULL, payload TEXT NOT NULL, markdown TEXT NOT NULL, html TEXT NOT NULL, delivery_status TEXT, UNIQUE(report_type, period_start, period_end));
-            CREATE INDEX IF NOT EXISTS idx_operational_reports_history ON operational_reports(report_type, generated_at DESC);
-            """)
+             CREATE TABLE IF NOT EXISTS operational_reports (id INTEGER PRIMARY KEY AUTOINCREMENT, report_type TEXT NOT NULL, period_start REAL NOT NULL, period_end REAL NOT NULL, generated_at REAL NOT NULL, status TEXT NOT NULL, payload TEXT NOT NULL, markdown TEXT NOT NULL, html TEXT NOT NULL, delivery_status TEXT, UNIQUE(report_type, period_start, period_end));
+             CREATE INDEX IF NOT EXISTS idx_operational_reports_history ON operational_reports(report_type, generated_at DESC);
+             CREATE TABLE IF NOT EXISTS notification_outbox (id INTEGER PRIMARY KEY AUTOINCREMENT, delivery_key TEXT NOT NULL UNIQUE, target_type TEXT NOT NULL, target_id INTEGER NOT NULL, channel TEXT NOT NULL, status TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, created_at REAL NOT NULL, updated_at REAL NOT NULL, attempt_started_at REAL, completed_at REAL, recipient_fingerprint TEXT NOT NULL DEFAULT '', error_class TEXT, reason TEXT);
+             CREATE INDEX IF NOT EXISTS idx_notification_outbox_status ON notification_outbox(status,created_at);
+             """)
             if "delivered_at" not in {row[1] for row in conn.execute("PRAGMA table_info(operational_reports)")}:
                 conn.execute("ALTER TABLE operational_reports ADD COLUMN delivered_at REAL")
+    def recover_delivery_attempts(self, now=None, stale_after_seconds=120):
+        now=time.time() if now is None else float(now); cutoff=now-max(30.0,float(stale_after_seconds))
+        with self._connect() as conn:
+            rows=self._rows(conn,"SELECT target_id,channel,attempts,reason FROM notification_outbox WHERE target_type='ALERT' AND status='ATTEMPTING' AND attempt_started_at<?",(cutoff,))
+            conn.execute("UPDATE notification_outbox SET status='AMBIGUOUS',updated_at=?,completed_at=?,error_class='PROCESS_INTERRUPTED',reason='delivery_outcome_unknown' WHERE target_type='ALERT' AND status='ATTEMPTING' AND attempt_started_at<?",(now,now,cutoff))
+            for row in rows:
+                conn.execute("UPDATE alert_deliveries SET status='AMBIGUOUS',error_reason='delivery_outcome_unknown' WHERE alert_id=? AND channel=? AND attempt=? AND status='ATTEMPTING'",(row["target_id"],row["channel"],row["attempts"]))
+        return len(rows)
 
     @staticmethod
     def _rows(conn, sql, args=()):
@@ -71,7 +81,7 @@ class AlertingService:
     def _maintenance(self, database_id, now):
         with self._connect() as conn: return bool(conn.execute("SELECT 1 FROM maintenance_windows WHERE database_id=? AND starts_at<=? AND ends_at>=? LIMIT 1", (database_id, now, now)).fetchone())
     def evaluate(self, database_id: str, now: float | None = None) -> list[dict[str, Any]]:
-        now = time.time() if now is None else now; context = self._context(database_id); candidates = []
+        now = time.time() if now is None else now; self.recover_delivery_attempts(now=now); context = self._context(database_id); candidates = []
         for f in self.findings.list_findings(database=database_id, resolved=None):
             if f["severity"] != "CRITICAL": continue
             mapping = {"NEW": "NEW_CRITICAL_FINDING", "WORSENING": "WORSENING_CRITICAL_FINDING", "REOPENED": "REOPENED_CRITICAL_FINDING", "RESOLVED": "RESOLVED_CRITICAL_FINDING"}
@@ -87,6 +97,11 @@ class AlertingService:
         if audit and audit["state"] != "SUCCESS": candidates.append(("AUDIT_EXECUTION_FAILURE", "P1", {"id": None, "summary": "Audit execution failed", "recommendation": "Review audit connectivity and runtime logs.", "severity": "CRITICAL"}, None))
         elif audit and audit["coverage_state"] != "FULL": candidates.append(("COVERAGE_DEGRADED", "P2", {"id": None, "summary": "Audit coverage degraded", "recommendation": "Restore full check coverage before resolving findings.", "severity": "MEDIUM"}, None))
         results = [self._upsert_event(database_id, typ, priority, item, flag, context, now) for typ, priority, item, flag in candidates]
+        if audit and audit["state"] == "SUCCESS" and audit["coverage_state"] == "FULL":
+            # Close only the target-level runtime/coverage alerts whose source
+            # evidence was repaired by this successful, full-coverage audit.
+            with self._connect() as conn:
+                conn.execute("UPDATE alert_events SET status='RECOVERED',updated_at=? WHERE database_id=? AND type IN ('AUDIT_EXECUTION_FAILURE','COVERAGE_DEGRADED') AND status='OPEN'",(now,database_id))
         return [item for item in results if item]
     def _upsert_event(self, database_id, typ, priority, item, flag, context, now):
         identity = item.get("id") or item.get("finding_id") or typ; key = self._key(database_id, typ, identity); suppressed = self._maintenance(database_id, now)
@@ -112,15 +127,30 @@ class AlertingService:
             if should and DEFAULT_POLICY[priority]["mode"] == "immediate": self._deliver(conn, event, now)
             return event
     def _deliver(self, conn, event, now, channel: NotificationChannel | None = None):
-        attempt = int(conn.execute("SELECT COUNT(*) FROM alert_deliveries WHERE alert_id=?", (event["id"],)).fetchone()[0]) + 1
+        if channel is None:
+            config = self.automation_service._delivery_config() if self.automation_service else {}
+            channel = SmtpNotificationChannel(config); recipients = config.get("default_recipients", [])
+        else: recipients = []
+        pending=conn.execute("SELECT status FROM notification_outbox WHERE target_type='ALERT' AND target_id=? AND channel=? AND status IN ('ATTEMPTING','AMBIGUOUS') ORDER BY id DESC LIMIT 1",(event["id"],channel.name)).fetchone()
+        if pending: return
+        attempt = int(conn.execute("SELECT COUNT(*) FROM notification_outbox WHERE target_type='ALERT' AND target_id=? AND channel=?", (event["id"],channel.name)).fetchone()[0]) + 1
+        delivery_key=f"alert:{event['id']}:{channel.name}:{attempt}"
+        recipient_fingerprint=hashlib.sha256("\n".join(sorted(str(item).strip().lower() for item in recipients)).encode()).hexdigest() if recipients else ""
+        conn.execute("INSERT INTO notification_outbox(delivery_key,target_type,target_id,channel,status,attempts,created_at,updated_at,attempt_started_at,recipient_fingerprint) VALUES(?,'ALERT',?,?,'ATTEMPTING',1,?,?,?,?)",(delivery_key,event["id"],channel.name,now,now,now,recipient_fingerprint))
+        conn.execute("INSERT INTO alert_deliveries(alert_id,channel,attempted_at,status,attempt) VALUES(?,?,?,'ATTEMPTING',?)",(event["id"],channel.name,now,attempt))
+        # Persist intent before contacting SMTP. A process loss after this commit
+        # is conservatively treated as ambiguous and is never blindly resent.
+        conn.commit()
         try:
-            if channel is None:
-                config = self.automation_service._delivery_config() if self.automation_service else {}; channel = SmtpNotificationChannel(config); recipients = config.get("default_recipients", [])
-            else: recipients = []
             channel.send(event["title"], f"Database: {event['database_id']}\n\nProblem: {event['summary']}\n\nReason: {event['reason']}\n\nRecommended action: {event['recommended_action']}", recipients)
-            conn.execute("INSERT INTO alert_deliveries(alert_id,channel,attempted_at,status,attempt) VALUES(?,?,?,?,?)", (event["id"],channel.name,now,"SENT",attempt)); conn.execute("UPDATE alert_events SET notification_count=notification_count+1 WHERE id=?", (event["id"],))
+            conn.execute("UPDATE notification_outbox SET status='SENT',updated_at=?,completed_at=? WHERE delivery_key=?",(time.time(),time.time(),delivery_key))
+            conn.execute("UPDATE alert_deliveries SET status='SENT' WHERE alert_id=? AND channel=? AND attempt=?",(event["id"],channel.name,attempt)); conn.execute("UPDATE alert_events SET notification_count=notification_count+1 WHERE id=?", (event["id"],))
         except Exception as exc:
-            safe = str(redact_secrets(str(exc)))[:240]; conn.execute("INSERT INTO alert_deliveries(alert_id,channel,attempted_at,status,error_reason,attempt) VALUES(?,?,?,?,?,?)", (event["id"],getattr(channel,"name","email"),now,"FAILED",safe,attempt))
+            safe = str(redact_secrets(str(exc)))[:240]
+            safe_failure=isinstance(exc,ValueError) and "not configured" in str(exc).lower()
+            status="FAILED" if safe_failure else "AMBIGUOUS"
+            conn.execute("UPDATE notification_outbox SET status=?,updated_at=?,completed_at=?,error_class=?,reason=? WHERE delivery_key=?",(status,time.time(),time.time(),"CONFIGURATION_ERROR" if safe_failure else "DELIVERY_OUTCOME_UNKNOWN",safe,delivery_key))
+            conn.execute("UPDATE alert_deliveries SET status=?,error_reason=? WHERE alert_id=? AND channel=? AND attempt=?",(status,safe,event["id"],channel.name,attempt))
     def list_alerts(self, *, status=None, priority=None, database=None, limit=100):
         where=[]; args=[]
         for field, value in (("status",status),("priority",priority),("database_id",database)):
@@ -145,7 +175,10 @@ class AlertingService:
     def notification_health(self):
         with self._connect() as conn:
             rows=self._rows(conn,"SELECT status,attempted_at FROM alert_deliveries ORDER BY attempted_at DESC LIMIT 3")
-        failures=sum(r["status"]=="FAILED" for r in rows); return {"status":"DEGRADED" if failures >= 3 else "HEALTHY", "consecutive_failures":failures, "last_delivery":rows[0] if rows else None}
+            ambiguous=conn.execute("SELECT COUNT(*) FROM notification_outbox WHERE status='AMBIGUOUS'").fetchone()[0]
+        self.recover_delivery_attempts()
+        with self._connect() as conn: ambiguous=conn.execute("SELECT COUNT(*) FROM notification_outbox WHERE status='AMBIGUOUS'").fetchone()[0]
+        failures=sum(r["status"] in {"FAILED","AMBIGUOUS"} for r in rows); return {"status":"DEGRADED" if failures >= 3 or ambiguous else "HEALTHY", "consecutive_failures":failures, "ambiguous_deliveries":ambiguous, "last_delivery":rows[0] if rows else None}
     def generate_report(self, report_type="daily", now=None):
         if report_type not in {"daily", "weekly"}: raise ValueError("Unknown report type")
         now=time.time() if now is None else now; seconds=86400 if report_type=="daily" else 604800; end=(now // seconds) * seconds; start=end-seconds

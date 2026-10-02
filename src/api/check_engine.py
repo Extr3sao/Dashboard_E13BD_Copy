@@ -29,6 +29,10 @@ class RuleDefinition:
     tags: Sequence[str] = field(default_factory=tuple)
     evidence_sensitivity: str = "internal"
     recommendation: str = ""
+    # Stable identity metadata. Version is declarative when available; the
+    # definition hash is derived from executable rule content by adapters.
+    version: str = "UNKNOWN"
+    definition_hash: str = ""
 
 
 @dataclass
@@ -48,6 +52,9 @@ class RuleResult:
     owner: Optional[str] = None
     object_name: Optional[str] = None
     recommendation: str = ""
+    rule_version: str = "UNKNOWN"
+    definition_hash: str = ""
+    coverage_meaning: str = "evaluated"
 
     def to_dict(self) -> Dict[str, Any]:
         payload = asdict(self); payload["status"] = self.status.value
@@ -100,11 +107,17 @@ class RuleEngine:
 
     def _coerce(self, rule: RuleDefinition, database_id: str, started: float, outcome: Any) -> RuleResult:
         if isinstance(outcome, RuleResult):
-            outcome.evidence = redact_evidence(outcome.evidence); outcome.error = redact_evidence(outcome.error); return outcome
+            outcome.evidence = redact_evidence(outcome.evidence); outcome.error = redact_evidence(outcome.error)
+            outcome.rule_version = outcome.rule_version if outcome.rule_version != "UNKNOWN" else rule.version
+            outcome.definition_hash = outcome.definition_hash or rule.definition_hash
+            if outcome.status is RuleStatus.SKIPPED and outcome.coverage_meaning == "evaluated": outcome.coverage_meaning = "not_evaluated"
+            elif outcome.status is RuleStatus.ERROR and outcome.coverage_meaning == "evaluated": outcome.coverage_meaning = "evaluation_error"
+            elif not outcome.coverage_meaning: outcome.coverage_meaning = "evaluated"
+            return outcome
         data = dict(outcome or {}); raw = str(data.pop("status", "PASS")).upper()
         status = RuleStatus(raw if raw in RuleStatus.__members__ else "ERROR")
         return self._result(rule, database_id, status, started, summary=str(data.pop("summary", "")), metrics=data.pop("metrics", {}), evidence=data.pop("evidence", data), error=data.pop("error", None))
 
     def _result(self, rule: RuleDefinition, database_id: str, status: RuleStatus, started: float, **values: Any) -> RuleResult:
         ended = time.time()
-        return RuleResult(rule.rule_id, database_id, status, rule.default_severity, started, ended, ended - started, recommendation=rule.recommendation, evidence=redact_evidence(values.pop("evidence", {})), error=redact_evidence(values.pop("error", None)), **values)
+        return RuleResult(rule.rule_id, database_id, status, rule.default_severity, started, ended, ended - started, recommendation=rule.recommendation, evidence=redact_evidence(values.pop("evidence", {})), error=redact_evidence(values.pop("error", None)), rule_version=rule.version, definition_hash=rule.definition_hash, coverage_meaning="not_evaluated" if status is RuleStatus.SKIPPED else ("evaluation_error" if status is RuleStatus.ERROR else "evaluated"), **values)

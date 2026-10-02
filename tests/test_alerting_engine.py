@@ -16,6 +16,12 @@ class Channel:
     def send(self, subject, body, recipients): self.calls += 1
 
 
+class AmbiguousChannel(Channel):
+    def send(self, subject, body, recipients):
+        self.calls += 1
+        raise TimeoutError("connection closed before SMTP receipt")
+
+
 class AlertingTests(unittest.TestCase):
     def setUp(self):
         db = tempfile.NamedTemporaryFile(suffix=".db", delete=False); db.close()
@@ -57,3 +63,20 @@ class AlertingTests(unittest.TestCase):
     def test_existing_scheduler_hook_only_generates_due_reports(self):
         self.assertEqual(len(self.service.run_scheduled_reports(now=100)), 2)
         self.assertEqual(self.service.run_scheduled_reports(now=101), [])
+
+    def test_ambiguous_smtp_attempt_is_never_blindly_retried(self):
+        event=self.service.evaluate("DWH",now=100)[0]
+        channel=AmbiguousChannel()
+        with self.service._connect() as conn:
+            self.service._deliver(conn,event,101,channel)
+            self.service._deliver(conn,event,102,channel)
+        self.assertEqual(channel.calls,1)
+        with self.service._connect() as conn:
+            self.assertEqual(conn.execute("SELECT status FROM notification_outbox WHERE target_id=? ORDER BY id DESC LIMIT 1",(event["id"],)).fetchone()[0],"AMBIGUOUS")
+
+    def test_interrupted_smtp_attempt_recovers_as_ambiguous(self):
+        with self.service._connect() as conn:
+            conn.execute("INSERT INTO notification_outbox(delivery_key,target_type,target_id,channel,status,attempts,created_at,updated_at,attempt_started_at) VALUES('lost','ALERT',1,'email','ATTEMPTING',1,1,1,1)")
+        self.assertEqual(self.service.recover_delivery_attempts(now=1000,stale_after_seconds=120),1)
+        with self.service._connect() as conn:
+            self.assertEqual(conn.execute("SELECT status FROM notification_outbox WHERE delivery_key='lost'").fetchone()[0],"AMBIGUOUS")

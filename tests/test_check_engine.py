@@ -13,4 +13,7 @@ class CheckEngineTests(unittest.TestCase):
     def test_post_crq_adapter_preserves_normalized_semantics(self):
         definition = definition_from_post_crq({"check_id":"CHECK_01", "title":"x", "severitat":"MITJA"})
         result = result_from_post_crq({"status":"ok", "row_count":1, "duration_ms":1, "rows":[{"password":"x"}], "columns":["password"]}, "E13DB", definition)
-        self.assertEqual(result.status, RuleStatus.FAIL); self.assertEqual(result.evidence["rows"][0]["password"], "[REDACTED]")
+        self.assertEqual(result.status, RuleStatus.FAIL)
+        self.assertEqual(result.evidence["row_count"], 1)
+        self.assertEqual(result.evidence["columns"], ["password"])
+        self.assertNotIn("rows", result.evidence)

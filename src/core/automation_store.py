@@ -146,6 +146,7 @@ class AutomationStore:
                     report_path TEXT,
                     deliveries_json TEXT DEFAULT '[]',
                     created_tasks_json TEXT DEFAULT '[]',
+                    audit_run_id TEXT,
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (job_id) REFERENCES scheduled_jobs(id) ON DELETE CASCADE
                 )
@@ -441,6 +442,7 @@ class AutomationStore:
                 """
             )
             self._ensure_column(conn, "scheduled_jobs", "job_config_json", "job_config_json TEXT DEFAULT '{}'")
+            self._ensure_column(conn, "job_runs", "audit_run_id", "audit_run_id TEXT")
             self._ensure_column(conn, "delivery_config", "tic_summary_recipients_json", "tic_summary_recipients_json TEXT DEFAULT '[]'")
             self._ensure_column(conn, "delivery_config", "provider_routes_json", "provider_routes_json TEXT DEFAULT '[]'")
             self._ensure_column(conn, "delivery_config", "failure_notification_recipients_json", "failure_notification_recipients_json TEXT DEFAULT '[]'")
@@ -823,19 +825,20 @@ class AutomationStore:
             )
             conn.commit()
 
-    def create_run(self, job_id: int, started_at: Optional[str] = None) -> int:
+    def create_run(self, job_id: int, started_at: Optional[str] = None, audit_run_id: Optional[str] = None) -> int:
         started_at = started_at or _utc_now_iso()
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                INSERT INTO job_runs (job_id, started_at, status, summary_json, deliveries_json, created_tasks_json)
-                VALUES (?, ?, 'running', '{}', '[]', '[]')
+                INSERT INTO job_runs (job_id, started_at, status, summary_json, deliveries_json, created_tasks_json, audit_run_id)
+                VALUES (?, ?, 'running', '{}', '[]', '[]', ?)
                 """,
-                (int(job_id), started_at),
+                (int(job_id), started_at, audit_run_id),
             )
+            run_id=int(cursor.lastrowid)
             conn.commit()
-            return int(cursor.lastrowid)
+            return run_id
 
     def recover_stale_runs(self, *, stale_before: str) -> List[int]:
         """Mark abandoned durable runs explicitly before a scheduler restart."""
@@ -1234,6 +1237,7 @@ class AutomationStore:
             "report_path": row["report_path"],
             "deliveries": _json_loads(row["deliveries_json"], []),
             "created_tasks": _json_loads(row["created_tasks_json"], []),
+            "audit_run_id": row["audit_run_id"] if "audit_run_id" in row.keys() else None,
             "created_at": row["created_at"] if "created_at" in row.keys() else None,
         }
 

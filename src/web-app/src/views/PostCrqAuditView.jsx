@@ -805,6 +805,18 @@ export default function PostCrqAuditView({
           </div>
         ) : null}
 
+        {result?.audit_run_id ? (
+          <div className="mt-4 rounded-xl border border-cyan-500/20 bg-cyan-500/5 px-4 py-3 text-xs text-muted-foreground" aria-label="AuditRun provenance">
+            <span className="font-semibold text-foreground">AuditRun</span>{' '}
+            <code className="select-all">{result.audit_run_id}</code>
+            <span className="mx-2 opacity-50">·</span>
+            <span>{result.trigger_type || 'MANUAL'}</span>
+            {result.reconciliation_state ? <><span className="mx-2 opacity-50">·</span><span>Reconciliation: {result.reconciliation_state}</span></> : null}
+            {result.runtime_identity?.git_sha ? <><span className="mx-2 opacity-50">·</span><span>Runtime: {result.runtime_identity.git_sha}</span></> : null}
+            {result.capability_snapshot_hash ? <><span className="mx-2 opacity-50">·</span><span>Capability snapshot: {result.capability_snapshot_hash}</span></> : null}
+          </div>
+        ) : null}
+
         <div className="mt-6 rounded-2xl border border-white/10 bg-black/10 p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>

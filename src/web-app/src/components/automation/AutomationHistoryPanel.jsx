@@ -188,7 +188,10 @@ export default function AutomationHistoryPanel({
                     ) : runs.map((run) => (
                       <React.Fragment key={run.id}>
                         <tr className="border-t border-white/10 align-top">
-                          <td className="px-3 py-4 text-foreground">{run.job_name || run.job_id}</td>
+                          <td className="px-3 py-4 text-foreground">
+                            <div>{run.job_name || run.job_id}</div>
+                            {run.audit_run_id && !String(run.audit_run_id).startsWith('AUTO-') ? <code className="mt-1 block max-w-56 truncate text-[10px] text-muted-foreground" title={run.audit_run_id}>AuditRun {run.audit_run_id}</code> : null}
+                          </td>
                           <td className="px-3 py-4 text-muted-foreground">{formatTimestamp(run.started_at)}</td>
                           <td className="px-3 py-4"><span className={`rounded-full border px-2 py-1 text-[11px] font-semibold uppercase tracking-wide ${runStatusClass(run.status)}`}>{runStatusLabel(run.status)}</span></td>
                           <td className="px-3 py-4 text-muted-foreground">{runLotSummary(run.summary)}</td>
