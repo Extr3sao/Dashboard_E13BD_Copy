@@ -217,6 +217,22 @@ test('AutomationView saves Post-CRQ scheduler config and always keeps backend ba
   });
 });
 
+test('AutomationView persists Oracle diagnostic thresholds in an operational job', async () => {
+  render(<AutomationView profiles={['E13DB']} />);
+  expect(await screen.findByText(/Nom del job/i)).toBeInTheDocument();
+  fireEvent.change(screen.getByRole('textbox', { name: /Nom del job/i }), { target: { value: 'Oracle diagnostics nightly' } });
+  fireEvent.change(screen.getByDisplayValue('Auditoria de canvis'), { target: { value: 'oracle_diagnostics' } });
+  fireEvent.change(screen.getByLabelText(/Tablespace warning/i), { target: { value: '82' } });
+  fireEvent.click(screen.getByRole('button', { name: /Crea job/i }));
+  await waitFor(() => expect(createAutomationJob).toHaveBeenCalledWith(expect.objectContaining({
+    name: 'Oracle diagnostics nightly',
+    audit_type: 'oracle_diagnostics',
+    checks: [],
+    report_format: 'markdown',
+    job_config: expect.objectContaining({ diagnostic_options: expect.objectContaining({ tablespace_warning_percent: 82 }) }),
+  })));
+});
+
 test('AutomationView separates TIC summary, special contexts and lot routes in Jobs context', async () => {
   render(<AutomationView profiles={['E13DB']} />);
 

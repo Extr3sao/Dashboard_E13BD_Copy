@@ -11,6 +11,7 @@ const ChecksAdminView = lazy(() => import('./ChecksAdminView.jsx'));
 const MailConfigView = lazy(() => import('./MailConfigView.jsx'));
 const DeepScanView = lazy(() => import('./DeepScanView.jsx'));
 const FindingsView = lazy(() => import('./FindingsView.jsx'));
+const OracleDiagnosticsView = lazy(() => import('./OracleDiagnosticsView.jsx'));
 const FleetDashboardView = lazy(() => import('./FleetDashboardView.jsx'));
 const AlertingReportsView = lazy(() => import('./AlertingReportsView.jsx'));
 const SUBTAB_IDS = Object.fromEntries(
@@ -125,6 +126,10 @@ export default function DatabaseAuditWorkspace({
               onRun={handleRunPostCrqAudit}
               onDownloadQueries={handleDownloadPostCrqQueries}
             />
+          )}
+
+          {databaseAuditSubtab === SUBTAB_IDS.oracleDiagnostics && (
+            <OracleDiagnosticsView profiles={profiles} selectedProfile={selectedProfile} onProfileChange={setSelectedProfile} />
           )}
           {databaseAuditSubtab === SUBTAB_IDS.automationOverview && (
             <AutomationView profiles={profiles} onOpenPostCrqRun={handleOpenAutomationPostCrqRun} />

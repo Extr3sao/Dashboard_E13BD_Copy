@@ -304,6 +304,11 @@ class TestAutomation(unittest.TestCase):
                 gc.collect()
                 time.sleep(0.1)
 
+    def test_parse_iso_utc_preserves_explicit_timezone_before_local_fallback(self):
+        expected=dt.datetime(2026,10,13,0,3,13)
+        self.assertEqual(parse_iso_utc("2026-10-13T00:03:13Z"),expected)
+        self.assertEqual(parse_iso_utc("2026-10-13T02:03:13+02:00"),expected)
+
     def test_compute_next_run_weekly(self):
         # TIME_DEPENDENT fix: the weekly schedule semantics are relative to
         # "now"; pin the clock near start_at so the assertion is deterministic

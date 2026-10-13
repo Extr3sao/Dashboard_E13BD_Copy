@@ -99,6 +99,15 @@ def _walk(value, depth=0):
 
 
 def classify_evidence(rule_id: str, summary: str, evidence: Any) -> str:
+    rule=str(rule_id or "").upper()
+    # Prefer the originating diagnostic rule over incidental fields. A SQL
+    # performance observation may also carry plan_hash/sql_id but remains a
+    # PERFORMANCE fact; the distinct plan rule records EXECUTION_PLAN facts.
+    if rule.startswith("ORACLE_SQL_PERFORMANCE"): return "PERFORMANCE"
+    if rule.startswith("ORACLE_PLAN_CHANGES") or rule.startswith("ORACLE_PLAN_DETAILS"): return "EXECUTION_PLAN"
+    if rule.startswith("ORACLE_BLOCKING"): return "LOCKING"
+    if rule.startswith("ORACLE_OBJECT_STATISTICS"): return "STATISTICS"
+    if rule.startswith("ORACLE_TEMP_CAPACITY") or rule.startswith("ORACLE_CAPACITY") or rule.startswith("ORACLE_SEGMENT_GROWTH"): return "CAPACITY"
     text = " ".join([str(rule_id or ""), str(summary or "")] + [f"{key} {value}" for key, value in _walk(_json(evidence, {}))]).lower()
     for category, markers in _CATEGORY_RULES:
         if any(marker in text for marker in markers):

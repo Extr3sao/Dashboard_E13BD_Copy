@@ -214,7 +214,7 @@ def test_safe_bounded_retention_preserves_active_and_manual_state(runtime):
     runtime.alerts.findings.reconcile("B", [result("B")], audit_run_id="old-resolved", observed_at=old)
     runtime.alerts.findings.reconcile("B", [{**result("B"), "status": "PASS"}], audit_run_id="resolve-B", observed_at=old)
     preview = runtime.retention()
-    assert preview["eligible_records"]["audit_runs"] == 3
+    assert preview["eligible_records"]["audit_runs"] == 2
     assert preview["eligible_records"]["finding_occurrences"] == 2
     assert preview["dry_run"]
     outcome = runtime.retention(True, limit=1)
@@ -222,6 +222,7 @@ def test_safe_bounded_retention_preserves_active_and_manual_state(runtime):
     assert runtime.alerts.findings.list_findings(database="A")[0]["status"] == "OPEN"
     with runtime._connect() as conn:
         assert conn.execute("SELECT COUNT(*) FROM finding_occurrences WHERE finding_id IN (SELECT id FROM findings WHERE database_id='A')").fetchone()[0] == 1
+        assert conn.execute("SELECT COUNT(*) FROM audit_runs WHERE audit_run_id='old-active'").fetchone()[0] == 1
 
 
 def test_sqlite_temporarily_locked_recovers(runtime):

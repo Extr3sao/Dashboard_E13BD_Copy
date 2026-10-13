@@ -1,11 +1,18 @@
 # E13DB roadmap recommendation after milestones 001–011
 
+## Delivery update (E13DB-013)
+
+- E13DB-012 was delivered from `7be7f228b8404a2e910c01e311ca7c07502bac4a` on `feature/e13db-012-durable-audit-evidence`.
+- E13DB-013 implementation is on `feature/e13db-013-oracle-deep-diagnostics`, based on that E13DB-012 SHA. It adds Oracle session/blocking, SQL/plan, workload-related statistics, segment-growth and capacity observations through the durable AuditRun pipeline. Fixture and real-API/browser verification is recorded in `docs/E13DB_013_IMPLEMENTATION_PLAN.md`; live Oracle certification is still pending.
+- Diagnostic SQL is read-only and bounded. Fixtures and a real-API/browser SQLite smoke verify product integration; a live Oracle validation remains required before claiming Oracle-server certification.
+- E13DB-014 remains the next roadmap milestone: baselines and regression intelligence beyond the current explicit, comparable-snapshot rules.
+
 ## Options assessed
 
 | Candidate | User/DBA value | Risk reduction | Architecture leverage | Complexity | Reuse potential | Timing |
 |---|---|---|---|---|---|---|
-| A. Oracle Deep Diagnostics | VERY HIGH | HIGH | MEDIUM | HIGH | MEDIUM | Wait until per-run capability/evidence authority exists; otherwise observations cannot be reproduced or safely gated |
-| B. Evidence, Capability & Reproducibility Foundation | HIGH | VERY HIGH | VERY HIGH | MEDIUM | HIGH | **Choose E13DB-012**; directly addresses false-success distinction and scheduled/manual audit divergence |
+| A. Oracle Deep Diagnostics | VERY HIGH | HIGH | MEDIUM | HIGH | MEDIUM | **E13DB-013 implemented on its feature branch** after the 012 authority foundation; live Oracle verification is pending |
+| B. Evidence, Capability & Reproducibility Foundation | HIGH | VERY HIGH | VERY HIGH | MEDIUM | HIGH | **Delivered as E13DB-012**; addresses false-success distinction and scheduled/manual audit divergence |
 | C. Architecture Modularization | LOW visible value | MEDIUM | HIGH | HIGH | LOW | Do only extractions required by B, not a standalone rewrite |
 | D. Product/UX Consolidation | MEDIUM | LOW/MEDIUM | LOW | LOW/MEDIUM | LOW | Do small walkthrough-driven fixes continuously; no evidence for a large redesign |
 | E. Multi-Database Foundation | HIGH eventual value | MEDIUM | HIGH | VERY HIGH | MEDIUM | FUTURE; target and RuleDefinition contracts/capability snapshot are not stable enough |
@@ -13,7 +20,7 @@
 
 ## Recommended E13DB-012
 
-**E13DB-012 — Durable Audit Evidence, Capability Snapshots & Reconciliation**
+**E13DB-012 — Durable Audit Evidence, Capability Snapshots & Reconciliation (delivered)**
 
 Why now:
 
@@ -66,15 +73,17 @@ certification pipeline.
   audit path produces visible Findings; absent Findings are distinguished from
   absent/ineligible evidence; SMTP UNKNOWN is not silently resent.
 
-### E13DB-013 — Oracle Capability Discovery & Deep Diagnostics
+### E13DB-013 — Oracle Capability Discovery & Deep Diagnostics (implemented; live Oracle certification pending)
 
-* Only after 012: discover Oracle version and read-only view privileges and store
-  a snapshot; capability-gate locking, SQL/plan, statistics and segment probes.
+* Discover Oracle version and read-only view privileges per connection and bind
+  the versioned capability snapshot to each AuditRun; capability-gate session,
+  locking, SQL/plan, statistics, segment and storage probes.
 * Default AWR/ASH to SKIPPED unless both explicit license acknowledgement and
   privilege are recorded; bounded rows/timeouts; no SQL binds or sensitive SQL
   text persisted.
-* Add plan/statistics/blocking evidence and contradictions with real Oracle test
-  fixtures; validate on a non-production Oracle target before release.
+* Add plan/statistics/blocking evidence and contradictions with deterministic
+  Oracle-shaped fixtures; run against a non-production Oracle target before
+  claiming live-server certification.
 
 ### E13DB-014 — Portable Target Adapters & Multi-Engine Readiness
 

@@ -3,6 +3,7 @@ export const DATABASE_AUDIT_SUBTABS = [
   { id: 'Anàlisi obsolets', helpKey: 'deepScan' },
   { id: "Repositori d'obsolets", helpKey: 'obsoletsRepository' },
   { id: 'Auditoria de canvis', helpKey: 'postCrqAudit' },
+  { id: 'Diagnòstics Oracle', helpKey: 'oracleDiagnostics' },
   { id: 'Problemes', helpKey: 'findings' },
   { id: 'Alertes i informes', helpKey: 'alertingReports' },
   { id: 'Automatitzacions', helpKey: 'automationOverview' },
@@ -19,6 +20,7 @@ export const DATABASE_AUDIT_HELP_KEYS = Object.fromEntries(
 export const DATABASE_AUDIT_SUBTABS_HIDE_PROFILE_SELECTOR = [
   'Anàlisi obsolets',
   'Auditoria de canvis',
+  'Diagnòstics Oracle',
   'Problemes',
   'Alertes i informes',
   'Automatitzacions',
@@ -28,6 +30,7 @@ export const DATABASE_AUDIT_SUBTABS_HIDE_PROFILE_SELECTOR = [
 ];
 
 export const DATABASE_AUDIT_SUBTABS_HIDE_GLOBAL_REPORT = [
+  'Diagnòstics Oracle',
   'Problemes',
   'Alertes i informes',
   'Automatitzacions',

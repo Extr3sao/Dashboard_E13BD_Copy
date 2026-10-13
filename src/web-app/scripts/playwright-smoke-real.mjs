@@ -1,4 +1,5 @@
 ﻿import { appendFile, mkdir, rm, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import process from 'node:process';
@@ -13,6 +14,9 @@ const envDir = path.join(outputDir, 'env');
 const debugLogPath = path.join(outputDir, 'real-backend-smoke.log');
 const backendPort = 8012;
 const baseUrl = `http://127.0.0.1:${backendPort}`;
+const pythonPath = process.env.E13DB_PYTHON || (process.platform === 'win32'
+  ? (existsSync(path.join(repoRoot, '.venv', 'Scripts', 'python.exe')) ? '.\\.venv\\Scripts\\python.exe' : '.\\.venv-repro\\Scripts\\python.exe')
+  : (existsSync(path.join(repoRoot, '.venv', 'bin', 'python')) ? '.venv/bin/python' : '.venv-repro/bin/python'));
 
 const shutdownState = { requested: false };
 
@@ -35,7 +39,7 @@ function startBackendServer(env) {
   if (process.platform === 'win32') {
     return runtimeStartProcess(
       'cmd.exe',
-      ['/d', '/s', '/c', `.\\.venv\\Scripts\\python.exe -m uvicorn src.api.main:app --host 127.0.0.1 --port ${backendPort}`],
+      ['/d', '/s', '/c', `${pythonPath} -m uvicorn src.api.main:app --host 127.0.0.1 --port ${backendPort}`],
       {
         cwd: repoRoot,
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -87,9 +91,9 @@ async function startServiceWithRetries(label, startFn, env, readyUrl, timeoutMs 
 async function runSeedScriptOnce(env) {
   await new Promise((resolve, reject) => {
     const child = spawn(
-      process.platform === 'win32' ? 'cmd.exe' : '.venv/Scripts/python.exe',
+      process.platform === 'win32' ? 'cmd.exe' : pythonPath,
       process.platform === 'win32'
-        ? ['/d', '/s', '/c', '.\\.venv\\Scripts\\python.exe scripts\\seed_real_backend_smoke.py']
+      ? ['/d', '/s', '/c', `${pythonPath} scripts\\seed_real_backend_smoke.py`]
         : ['scripts/seed_real_backend_smoke.py'],
       {
         cwd: repoRoot,
@@ -183,6 +187,11 @@ async function runRealSmoke(page) {
   await logStep('goto app');
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
 
+  await logStep('authenticate smoke USER');
+  await page.getByLabel('Usuari').fill('smoke-user');
+  await page.getByLabel('Contrasenya').fill('smoke-password');
+  await page.getByRole('button', { name: 'Entra' }).click();
+
   await logStep('verify shell');
   await verifyText(page, 'Oracle Audit');
   await verifyText(page, 'E13DB');
@@ -191,6 +200,20 @@ async function runRealSmoke(page) {
   await clickSubtab(page, 'Auditoria de canvis');
   await verifyText(page, 'Control de qualitat post-CRQ');
   await verifyText(page, 'CHECK_01');
+
+  await logStep('Oracle diagnostics evidence through real API and SQLite fixture');
+  await clickSubtab(page, 'Diagnòstics Oracle');
+  await verifyText(page, 'Oracle Deep Diagnostics');
+  await verifyText(page, 'AUD-SCH-PLAYWRIGHT-DIAGNOSTICS');
+  await verifyText(page, 'Root blocker');
+  await verifyText(page, 'SID 128');
+  await verifyText(page, 'NOT_LICENSED');
+  await page.getByRole('button', { name: /Finding #\d+ · CRITICAL/ }).first().click();
+  await page.getByRole('dialog', { name: 'Finding detail' }).waitFor({ state: 'visible', timeout: 15000 });
+  await page.getByRole('button', { name: /Open investigation for this Finding/i }).click();
+  await verifyText(page, 'Investigations');
+  await verifyText(page, 'Observed blocking chain');
+  await page.getByRole('button', { name: 'Auditoria BBDD', exact: true }).click();
 
   await logStep('automation dashboard and monthly pdf');
   await clickSubtab(page, 'Automatitzacions');
@@ -217,18 +240,18 @@ async function runRealSmoke(page) {
   await verifyText(page, "Històric d'execucions");
   await verifyText(page, 'Job real backend');
   const historyPanel = page.locator('#history');
-  const firstRunRow = historyPanel.locator('tbody tr').first();
-  await historyPanel.getByRole('button', { name: /^Lots$/i }).first().click();
+  const reportRunRow = historyPanel.locator('tbody tr').filter({ hasText: 'Job real backend' }).first();
+  await reportRunRow.getByRole('button', { name: /^Lots$/i }).click();
   await verifyText(page, 'LOT_AUX');
   await expectAttachmentResponse(
     page,
-    () => firstRunRow.getByRole('link', { name: /^Informe$/i }).click(),
+    () => reportRunRow.getByRole('link', { name: /^Informe$/i }).click(),
     '/api/automation/runs/1/report',
     'real_backend_run_report.pdf',
   );
   await expectClientSideDownload(
     page,
-    () => firstRunRow.getByRole('button', { name: /^CSV$/i }).click(),
+    () => reportRunRow.getByRole('button', { name: /^CSV$/i }).click(),
     'automation_run_1_lots.csv',
   );
   await page.getByRole('button', { name: /^Reintents/i }).click();
@@ -260,10 +283,13 @@ async function runRealSmoke(page) {
   await clickSubtab(page, 'Tasques i regles');
   await verifyText(page, 'Revisar LOT_APP');
   await verifyText(page, 'ALT');
-  await page.getByRole('button', { name: /Resoldre/i }).first().click();
-  await verifyText(page, 'Tasca actualitzada.');
-  await page.getByRole('button', { name: /Crear regla/i }).click();
-  await verifyText(page, 'Regla global creada.');
+  const diagnosticTask=page.locator('article').filter({hasText:'Revisar LOT_APP'}).first();
+  await diagnosticTask.locator('select').selectOption('resolta');
+  await page.waitForFunction(() => Array.from(document.querySelectorAll('article')).some((item) => item.textContent?.includes('Revisar LOT_APP') && item.querySelector('select')?.value === 'resolta'));
+  await verifyText(page, 'Regles globals');
+  const globalRule=page.getByLabel('Activa').first();
+  await globalRule.click();
+  await verifyText(page, 'Safata interna de tasques');
 
   await logStep('mail config save');
   await clickSubtab(page, /Configuraci.*servidor/i);
@@ -315,6 +341,9 @@ async function prepareEnvironment() {
   return {
     CONNECTIONS_FILE: connectionsFile,
     DEFAULT_PROFILE: 'E13DB',
+    E13DB_AUTH_REQUIRED: 'true',
+    E13DB_USER_USERNAME: 'smoke-user',
+    E13DB_USER_PASSWORD: 'smoke-password',
     INTERNAL_DB_PATH: internalDbPath,
     AUTOMATION_DB_PATH: automationDbPath,
     REAL_SMOKE_OUTPUT_DIR: outputDir,
@@ -333,7 +362,7 @@ async function main() {
       'real-backend',
       startBackendServer,
       backendEnv,
-      `http://127.0.0.1:${backendPort}/api/profiles`,
+      `http://127.0.0.1:${backendPort}/healthz`,
       45000,
       3,
     );

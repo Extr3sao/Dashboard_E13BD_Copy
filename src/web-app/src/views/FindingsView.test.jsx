@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
 import { getInvestigations } from '../api/investigations.js';
+import { getFinding } from '../api/findings.js';
 
 vi.mock('../api/findings.js', () => ({
   getNeedsAttention: vi.fn(() => Promise.resolve({ items: [{ id: 1, finding_id: 7, priority: 'P1', database_id: 'PROD_DB', finding_summary: 'USERS tablespace usage', finding_delta: 'WORSENING', explanation: 'critical production target' }], summary: { findings: { NEW: 1, WORSENING: 1 }, red_flags: { P1: 1, P2: 0, P3: 0, P4: 0 } } })),
@@ -36,5 +37,13 @@ describe('FindingsView', () => {
     fireEvent.click(screen.getAllByRole('button', { name: /USERS tablespace usage/ })[0]);
     expect(opened).toHaveBeenCalled();
     window.removeEventListener('e13db-open-investigation', opened);
+  });
+
+  test('diagnostic navigation opens the requested Finding evidence', async () => {
+    localStorage.setItem('e13db:selected-finding-id','7');
+    render(<FindingsView database="PROD_DB" />);
+    expect(await screen.findByRole('dialog',{name:'Finding detail'})).toBeInTheDocument();
+    expect(getFinding).toHaveBeenCalledWith(7);
+    expect(localStorage.getItem('e13db:selected-finding-id')).toBeNull();
   });
 });

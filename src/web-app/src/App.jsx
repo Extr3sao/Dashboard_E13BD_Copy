@@ -49,6 +49,16 @@ function App() {
     window.addEventListener('e13db-open-investigation', listener);
     return () => window.removeEventListener('e13db-open-investigation', listener);
   }, [setActiveTab]);
+  useEffect(() => {
+    const listener = (event) => {
+      if (!event.detail?.id) return;
+      localStorage.setItem('e13db:selected-finding-id', String(event.detail.id));
+      setActiveTab('Auditoria BBDD');
+      setDatabaseAuditSubtab('Problemes');
+    };
+    window.addEventListener('e13db-open-finding', listener);
+    return () => window.removeEventListener('e13db-open-finding', listener);
+  }, [setActiveTab, setDatabaseAuditSubtab]);
   const { profiles } = useProfiles({
     apiBase: API_BASE,
     onDefaultProfile: setSelectedProfile,

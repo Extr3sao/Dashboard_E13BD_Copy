@@ -334,8 +334,22 @@ class OperationsRuntime:
     def retention(self, execute=False, limit=1000):
         limit = max(1, min(int(limit), 5000))
         now = self.clock()
+        with self._connect() as conn:
+            available_tables={row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        diagnostic_references=[]
+        if {"investigation_evidence","investigations"}.issubset(available_tables):
+            diagnostic_references.append("audit_run_id NOT IN (SELECT DISTINCT e.audit_run_id FROM investigation_evidence e JOIN investigations i ON i.id=e.investigation_id WHERE i.status IN ('OPEN','MONITORING') AND e.audit_run_id IS NOT NULL)")
+        if {"finding_occurrences","findings"}.issubset(available_tables):
+            diagnostic_references.append("audit_run_id NOT IN (SELECT DISTINCT o.audit_run_id FROM finding_occurrences o JOIN findings f ON f.id=o.finding_id WHERE f.status!='RESOLVED')")
+        diagnostic_guard=" AND ".join(diagnostic_references) or "1=1"
+        audit_references=[]
+        if {"finding_occurrences","findings"}.issubset(available_tables):
+            audit_references.append("audit_run_id NOT IN (SELECT DISTINCT o.audit_run_id FROM finding_occurrences o JOIN findings f ON f.id=o.finding_id WHERE f.status!='RESOLVED')")
+        if {"investigation_evidence","investigations"}.issubset(available_tables):
+            audit_references.append("audit_run_id NOT IN (SELECT DISTINCT e.audit_run_id FROM investigation_evidence e JOIN investigations i ON i.id=e.investigation_id WHERE i.status IN ('OPEN','MONITORING') AND e.audit_run_id IS NOT NULL)")
+        audit_guard="state!='RUNNING'"+(" AND "+" AND ".join(audit_references) if audit_references else "")
         policies = [
-            ("audit_runs", "completed_at", "audit_history", "state!='RUNNING'"),
+            ("audit_runs", "completed_at", "audit_history", audit_guard),
             ("finding_occurrences", "observed_at", "finding_occurrences", "finding_id IN (SELECT id FROM findings WHERE status='RESOLVED')"),
             ("red_flags", "updated_at", "alerts", "status='RESOLVED' AND (finding_id IS NULL OR finding_id IN (SELECT id FROM findings WHERE status='RESOLVED'))"),
             ("alert_events", "updated_at", "alerts", "status IN ('CLOSED','RECOVERED') AND actor IS NULL AND id NOT IN (SELECT alert_id FROM alert_deliveries)"),
@@ -346,6 +360,8 @@ class OperationsRuntime:
             ("operations_backups", "created_at", "operational_metrics", "status IN ('FAILED','EXPIRED')"),
             ("finding_reconciliation_receipts", "observed_at", "audit_history", "audit_run_id NOT IN (SELECT audit_run_id FROM audit_runs) AND audit_run_id NOT IN (SELECT audit_run_id FROM finding_occurrences)"),
         ]
+        if "oracle_diagnostic_observations" in available_tables:
+            policies.insert(1,("oracle_diagnostic_observations","observed_at","audit_history",diagnostic_guard))
         result = {"dry_run": not execute, "batch_limit": limit, "configured_retention": self.config.retention, "eligible_records": {}, "deleted": {}}
         with self._connect() as conn:
             if execute:

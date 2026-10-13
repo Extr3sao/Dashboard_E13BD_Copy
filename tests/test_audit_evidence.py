@@ -233,7 +233,9 @@ def test_capability_discovery_is_read_only_bounded_and_license_gated():
     assert snapshot["available_privileges"]==["SELECT ANY DICTIONARY"]
     assert snapshot["capabilities"]["AWR_ALLOWED"]=="NOT_LICENSED"
     assert not any("awr" in sql.lower() or "ash" in sql.lower() for sql in dbm.connection.queries)
-    assert all(sql.lstrip().lower().startswith("select") and " where 1=0" in sql.lower() or "session_privs" in sql.lower() for sql in dbm.connection.queries)
+    assert all(sql.lstrip().lower().startswith("select") for sql in dbm.connection.queries)
+    assert any("session_privs" in sql.lower() for sql in dbm.connection.queries)
+    assert any("sys_context('userenv','con_id')" in sql.lower() for sql in dbm.connection.queries)
 
 
 def test_rulepack_identity_and_failure_classes_are_stable(stores):

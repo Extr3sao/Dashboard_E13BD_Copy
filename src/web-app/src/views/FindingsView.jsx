@@ -33,10 +33,17 @@ export default function FindingsView({ database }) {
 
   React.useEffect(() => { load(); }, [load]);
 
-  async function openFinding(id) {
+  const openFinding = React.useCallback(async (id) => {
     try { setSelected(await getFinding(id)); setAction(''); setReason(''); setReviewDate(''); }
     catch (_error) { setError('No s’ha pogut carregar el detall del finding.'); }
-  }
+  }, []);
+
+  React.useEffect(() => {
+    const requested=localStorage.getItem('e13db:selected-finding-id');
+    if (!requested) return;
+    localStorage.removeItem('e13db:selected-finding-id');
+    openFinding(Number(requested));
+  }, [openFinding]);
 
   async function submitAction(event) {
     event.preventDefault();

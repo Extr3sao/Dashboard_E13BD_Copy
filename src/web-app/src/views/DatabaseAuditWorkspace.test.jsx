@@ -21,9 +21,11 @@ const deepScanViewMock = vi.fn((props) => (
     <button type="button" onClick={() => props.setSchemaToAudit('NEWSCHEMA')}>schema change</button>
   </div>
 ));
+const oracleDiagnosticsViewMock = vi.fn((props) => <div>Oracle diagnostics mock · {props.selectedProfile}</div>);
 
 vi.mock('./PostCrqAuditView.jsx', () => ({ default: (props) => postCrqViewMock(props) }));
 vi.mock('./DeepScanView.jsx', () => ({ default: (props) => deepScanViewMock(props) }));
+vi.mock('./OracleDiagnosticsView.jsx', () => ({ default: (props) => oracleDiagnosticsViewMock(props) }));
 vi.mock('./AutomationView.jsx', () => ({ default: () => <div>Automation view mock</div> }));
 vi.mock('./AutomationRulesView.jsx', () => ({ default: () => <div>Automation rules mock</div> }));
 vi.mock('./ChecksAdminView.jsx', () => ({ default: () => <div>Checks admin mock</div> }));
@@ -127,4 +129,11 @@ test('DatabaseAuditWorkspace renders DeepScan and passes deep-audit props', asyn
     schemaToAudit: 'SCH1',
     DEFAULT_SCORING_CONFIG: { ownerWeight: 25 },
   }));
+});
+
+test('DatabaseAuditWorkspace exposes Oracle diagnostics for the selected target', async () => {
+  const props=buildProps({databaseAuditSubtab:'Diagnòstics Oracle'});
+  render(<DatabaseAuditWorkspace {...props}/>);
+  expect(await screen.findByText('Oracle diagnostics mock · P1')).toBeInTheDocument();
+  expect(oracleDiagnosticsViewMock.mock.calls.at(-1)[0]).toEqual(expect.objectContaining({profiles:props.profiles,selectedProfile:'P1'}));
 });

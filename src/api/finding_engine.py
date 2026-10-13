@@ -289,7 +289,7 @@ class FindingStore:
         rows = self._rows("SELECT * FROM audit_runs WHERE " + where + " ORDER BY completed_at", args)
         return [{"at": row["completed_at"], "active_findings": len(self.list_findings(database=row["database_id"])), "critical_findings": sum(item["severity"] == "CRITICAL" for item in self.list_findings(database=row["database_id"])), "red_flags": len(self.list_red_flags(database_id=row["database_id"])), "unreachable": int(row["state"] != "SUCCESS"), "failed_audits": int(row["state"] != "SUCCESS"), "coverage": row["coverage_ratio"]} for row in rows]
 
-    def reconcile_post_crq(self, report: dict[str, Any], *, target_context: dict[str, Any] | None = None, audit_run_id: str | None = None) -> dict[str, Any]:
+    def reconcile_post_crq(self, report: dict[str, Any], *, target_context: dict[str, Any] | None = None, audit_run_id: str | None = None, audit_state: str = "SUCCESS") -> dict[str, Any]:
         """Use bounded row envelopes when Post-CRQ can identify the affected object."""
         database_id = _text((report.get("context") or {}).get("profile"))
         by_rule = {item.get("rule_id"): item for item in report.get("rule_results") or []}
@@ -302,12 +302,18 @@ class FindingStore:
                 continue
             item = dict(base)
             item.update({"owner": envelope.get("schema"), "object_name": envelope.get("object_name"), "object_type": envelope.get("object_type"), "severity": envelope.get("sql_severity") or base.get("severity"), "summary": envelope.get("title") or base.get("summary"), "evidence": redact_evidence(envelope.get("evidence") or {})})
+            if str(report.get("audit_type") or "").lower()=="oracle_diagnostics":
+                observed_value=(envelope.get("evidence") or {}).get("value")
+                if isinstance(observed_value,(int,float)):
+                    direction=(envelope.get("evidence") or {}).get("comparison_direction")
+                    if direction not in {"higher_is_worse","lower_is_worse"}: direction="none"
+                    item["metrics"]={**(item.get("metrics") or {}),"value":observed_value,"comparison_direction":direction}
             expanded.append(item)
         # Passes are kept so their successfully evaluated rule scope can resolve
         # prior object-level findings. A failed rule without a usable object stays rule-level.
         covered = {item.get("rule_id") for item in expanded}
         expanded.extend(item for item in by_rule.values() if _normalized(item.get("status")) == "PASS" or item.get("rule_id") not in covered)
-        return self.reconcile(database_id, expanded, audit_run_id=audit_run_id or report.get("audit_run_id"), target_context=target_context)
+        return self.reconcile(database_id, expanded, audit_run_id=audit_run_id or report.get("audit_run_id"), audit_state=audit_state, target_context=target_context)
 
     @staticmethod
     def _evolution(previous: Any, current: Any, direction: str) -> str:

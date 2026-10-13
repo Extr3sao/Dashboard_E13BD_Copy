@@ -122,7 +122,10 @@ export default function AutomationJobsPanel({
                   <Info size={12} className="cursor-help text-muted-foreground transition-colors hover:text-primary" />
                   <div className="invisible absolute bottom-full left-1/2 mb-2 w-64 -translate-x-1/2 rounded-lg border border-white/10 bg-slate-900 p-2 text-[10px] leading-relaxed text-foreground opacity-0 shadow-xl transition-all group-hover:visible group-hover:opacity-100">
                     <p className="font-bold text-primary">Auditoria de canvis:</p>
-                    <p>Analitza l historial de canvis (checks SQL) en un rang de dates.</p>
+                    <p>Analitza l'historial de canvis (checks SQL) en un rang de dates.</p>
+                    <hr className="my-1 border-white/5" />
+                    <p className="font-bold text-primary">Diagnòstics Oracle:</p>
+                    <p>Observa sessions, bloquejos, SQL, plans, estadístiques i capacitat amb evidència persistent. No executa remediacions.</p>
                     <hr className="my-1 border-white/5" />
                     <p className="font-bold text-primary">Distribució per lots:</p>
                     <p>Genera informes individuals per lot, basats en l'última execució de l'Audit Engine.</p>
@@ -132,6 +135,7 @@ export default function AutomationJobsPanel({
               <select value={form.audit_type} onChange={(event) => setForm((current) => ({ ...current, audit_type: event.target.value }))} className="rounded-xl border border-border bg-white p-3 text-sm text-slate-900 outline-none focus:ring-1 focus:ring-primary">
                 <option value="post_crq">Auditoria de canvis</option>
                 <option value="post_crq_distribution">Distribució per lots Post-CRQ</option>
+                <option value="oracle_diagnostics">Diagnòstics Oracle operatius</option>
               </select>
             </label>
             <label className="flex flex-col gap-2 text-sm">
@@ -165,7 +169,7 @@ export default function AutomationJobsPanel({
               <input type="checkbox" checked={form.enabled} onChange={(event) => setForm((current) => ({ ...current, enabled: event.target.checked }))} />
               Job actiu
             </label>
-            <label className="flex flex-col gap-2 text-sm">
+            {['post_crq', 'post_crq_distribution'].includes(form.audit_type) ? <label className="flex flex-col gap-2 text-sm">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Checks inclosos</span>
                 <div className="group relative">
@@ -178,7 +182,7 @@ export default function AutomationJobsPanel({
               <select multiple value={form.selected_checks} onChange={(event) => setForm((current) => ({ ...current, selected_checks: Array.from(event.target.selectedOptions).map((option) => option.value) }))} className="min-h-[120px] rounded-xl border border-border bg-white p-3 text-sm text-slate-900 outline-none focus:ring-1 focus:ring-primary">
                 {checks.map((check) => <option key={check.check_id} value={check.check_id}>{check.title || check.check_id}</option>)}
               </select>
-            </label>
+            </label> : null}
           </div>
 
           {['post_crq', 'post_crq_distribution'].includes(form.audit_type) ? (
@@ -238,6 +242,27 @@ export default function AutomationJobsPanel({
                   La criticitat dels jobs d'automatització sempre es resol amb la configuració base del backend.
                   Els overrides manuals només estan disponibles a l'execució interactiva.
                 </div>
+              </div>
+            </div>
+          ) : null}
+
+          {form.audit_type === 'oracle_diagnostics' ? (
+            <div className="mt-6 rounded-2xl border border-sky-400/20 bg-sky-500/5 p-4">
+              <h3 className="font-bold text-sky-100">Llindars dels diagnòstics</h3>
+              <p className="mt-1 text-xs text-muted-foreground">Només les variacions comparables generen alertes de regressió. AWR/ASH no es consulten i no hi ha accions correctives automàtiques.</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {[
+                  ['blocking_warning_seconds','Bloqueig warning (segons)',5,86400],
+                  ['blocking_critical_seconds','Bloqueig critical (segons)',6,604800],
+                  ['blocking_critical_sessions','Sessions afectades critical',2,100],
+                  ['sql_elapsed_warning_seconds','SQL warning (seg/exec)',0.1,3600],
+                  ['sql_elapsed_critical_seconds','SQL critical (seg/exec)',0.2,86400],
+                  ['sql_regression_percent','Regressió comparable (%)',5,1000],
+                  ['segment_growth_warning_percent','Creixement segment warning (%)',1,1000],
+                  ['segment_growth_critical_percent','Creixement segment critical (%)',2,10000],
+                  ['tablespace_warning_percent','Tablespace warning (%)',10,99],
+                  ['tablespace_critical_percent','Tablespace critical (%)',11,100],
+                ].map(([key,label,min,max]) => <label key={key} className="flex flex-col gap-1 text-xs text-muted-foreground">{label}<input type="number" min={min} max={max} step={key.includes('seconds') ? 0.1 : 1} value={form.diagnostic_options?.[key] ?? ''} onChange={(event) => setForm((current) => ({ ...current, diagnostic_options: { ...(current.diagnostic_options || {}), [key]: Number(event.target.value) } }))} className="rounded-lg border border-white/10 bg-slate-900 p-2 text-sm text-foreground" /></label>)}
               </div>
             </div>
           ) : null}

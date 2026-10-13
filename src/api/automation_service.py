@@ -102,16 +102,14 @@ def parse_iso_utc(value: Optional[str]) -> Optional[dt.datetime]:
     cleaned = str(value).strip().replace(" ", "T").replace("Z", "+00:00")
     try:
         if "T" in cleaned:
-            # Intents per formats horaris
-            try:
-                if len(cleaned) >= 16:
-                    # YYYY-MM-DDTHH:MM
-                    parsed = dt.datetime.strptime(cleaned[:16], "%Y-%m-%dT%H:%M")
-                else:
-                    parsed = dt.datetime.fromisoformat(cleaned[:19] if len(cleaned) > 19 and "+" not in cleaned else cleaned)
-            except ValueError:
-                # Fallback al format ISO estàndard segur
-                parsed = dt.datetime.fromisoformat(cleaned[:19] if len(cleaned) > 19 and "+" not in cleaned else cleaned)
+            # Preserve explicit UTC/offset information before the legacy
+            # minute-precision local-time fallback.
+            if re.search(r"(?:\+|-)\d{2}:?\d{2}$",cleaned):
+                parsed=dt.datetime.fromisoformat(cleaned)
+            elif len(cleaned) >= 16:
+                parsed=dt.datetime.strptime(cleaned[:16],"%Y-%m-%dT%H:%M")
+            else:
+                parsed=dt.datetime.fromisoformat(cleaned)
         else:
             # Format data simple
             parsed = dt.datetime.combine(dt.date.fromisoformat(cleaned[:10]), dt.time.min)
@@ -357,7 +355,7 @@ class AutomationService:
 
         start = utc_now()
         audit_type = (job.get("audit_type") or "").lower()
-        evidence_enabled = bool(self.audit_evidence_service and audit_type in {"post_crq", "post_crq_distribution"})
+        evidence_enabled = bool(self.audit_evidence_service and audit_type in {"post_crq", "post_crq_distribution", "oracle_diagnostics"})
         audit_run_id = None
         if evidence_enabled:
             if manual:
@@ -751,6 +749,19 @@ class AutomationService:
             finally:
                 dbm.close()
 
+        if audit_type == "oracle_diagnostics":
+            from src.api.oracle_diagnostics import run_oracle_diagnostics
+            dbm = OracleDBManager(params)
+            try:
+                return run_oracle_diagnostics(
+                    dbm, params["PROFILE_NAME"],
+                    audit_context=job.get("_e13db_audit_context") or {},
+                    options=(job.get("job_config") or {}).get("diagnostic_options") or {},
+                    evidence_service=self.audit_evidence_service,
+                )
+            finally:
+                dbm.close()
+
         if audit_type in {"deep_scan", "obsolets"}:
             dbm = OracleDBManager(params)
             try:
@@ -839,6 +850,13 @@ class AutomationService:
                     handle.write(text)
             return path
 
+        if audit_type == "oracle_diagnostics":
+            from src.api.oracle_diagnostics import render_diagnostic_markdown
+            path=os.path.join(self.reports_dir,f"{base_name}.md")
+            with open(path,"w",encoding="utf-8") as handle:
+                handle.write(render_diagnostic_markdown(report_data))
+            return path
+
         if fmt == "pdf":
             content = build_standard_pdf(profile, report_data)
             with open(path, "wb") as handle:
@@ -904,6 +922,13 @@ class AutomationService:
                 },
             )
 
+        if audit_type == "oracle_diagnostics":
+            summary=report_data.get("summary") or {}; severity_counts={}
+            for item in report_data.get("finding_envelopes") or []:
+                severity=normalize_severity(item.get("sql_severity") or "BAIX")
+                severity_counts[severity]=severity_counts.get(severity,0)+1
+            return (f"Diagnòstics: {summary.get('checks_total',0)} | Troballes: {len(report_data.get('finding_envelopes') or [])} | Errors: {summary.get('checks_error',0)} | Skipped: {summary.get('checks_skipped',0)}",severity_counts)
+
         counts: Dict[str, int] = {}
         for item in report_data or []:
             score = float(item.get("obsolescence_score") or 0)
@@ -943,6 +968,9 @@ class AutomationService:
 
     def _detect_report_generation_failure(self, job: Dict[str, Any], report_data: Any) -> Optional[Dict[str, Any]]:
         audit_type = str(job.get("audit_type") or "").strip().lower()
+        if audit_type=="oracle_diagnostics" and isinstance(report_data,dict) and report_data.get("audit_state")=="FAILED":
+            capability=(report_data.get("capability_snapshot") or {}).get("connection_class") or "UNKNOWN"
+            return {"message":f"Oracle diagnostic target unavailable ({capability}); no health conclusion was made.","classification":capability}
         if audit_type not in {"post_crq", "post_crq_distribution"} or not isinstance(report_data, dict):
             return None
 

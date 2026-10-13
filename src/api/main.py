@@ -5,6 +5,7 @@ import datetime
 import io
 import logging
 import os
+import math
 import csv
 import html
 import glob
@@ -469,6 +470,37 @@ def _run_post_crq_with_evidence(dbm, selected_profile, payload: Dict) -> Dict[st
         raise
 
 
+def _run_oracle_diagnostics_with_evidence(dbm,selected_profile,payload:Dict,*,trigger_type="MANUAL",trigger_reference="manual_oracle_diagnostics"):
+    from src.api.oracle_diagnostics import run_oracle_diagnostics
+    profile=selected_profile or payload.get("profile") or "UNKNOWN"
+    audit_run_id=str(payload.get("audit_run_id") or ("AUD-MAN-"+uuid.uuid4().hex))
+    trigger_reference=str(payload.get("trigger_reference") or trigger_reference)
+    attempt=audit_evidence_service.begin(audit_run_id,profile,trigger_type=trigger_type,trigger_reference=trigger_reference,target_context=payload.get("target_context"))
+    if attempt.get("already_reconciled"): return audit_evidence_service.replay_result(audit_run_id)
+    if attempt.get("needs_reconciliation"):
+        audit_evidence_service.reconcile(audit_run_id)
+        return audit_evidence_service.replay_result(audit_run_id)
+    persisted=False
+    try:
+        report=run_oracle_diagnostics(dbm,profile,audit_context={"audit_run_id":audit_run_id,"trigger_type":trigger_type,"trigger_reference":trigger_reference},options=_normalize_oracle_diagnostic_options(payload.get("diagnostic_options") or {}),evidence_service=audit_evidence_service)
+        persisted_evidence=audit_evidence_service.persist_completed(audit_run_id,attempt["attempt_no"],report,target_context=payload.get("target_context"))
+        persisted=True
+        operational=audit_evidence_service.reconcile(audit_run_id)
+        report["operational_summary"]=operational.get("findings")
+        report["red_flags"]=operational.get("red_flags")
+        report["audit_run_id"]=audit_run_id
+        report["reconciliation_state"]=operational.get("reconciliation_state")
+        report["capability_snapshot_hash"]=persisted_evidence.get("capability_snapshot_hash")
+        report["rule_pack_identity"]=persisted_evidence.get("rule_pack_identity")
+        report["coverage_state"]=persisted_evidence.get("coverage_state")
+        return report
+    except Exception as exc:
+        if not persisted:
+            from src.api.audit_evidence import classify_failure
+            audit_evidence_service.fail(audit_run_id,attempt["attempt_no"],classify_failure(exc),str(exc))
+        raise
+
+
 def _normalize_post_crq_criticality_overrides(raw_overrides: Any) -> Dict[str, str]:
     normalized: Dict[str, str] = {}
     allowed = {"CRITIC", "MITJA", "BAIX"}
@@ -526,6 +558,41 @@ def _normalize_post_crq_job_config(payload: Dict) -> Dict[str, Any]:
     }
 
 
+def _normalize_oracle_diagnostic_options(raw: Any) -> Dict[str, Any]:
+    source=raw if isinstance(raw,dict) else {}
+    def integer(name,default,minimum,maximum):
+        try: value=int(source.get(name,default))
+        except (TypeError,ValueError): value=default
+        return max(minimum,min(maximum,value))
+    def number(name,default,minimum,maximum):
+        try: value=float(source.get(name,default))
+        except (TypeError,ValueError): value=default
+        if not math.isfinite(value): value=default
+        return max(minimum,min(maximum,value))
+    warning=number("tablespace_warning_percent",80,10,99)
+    critical=number("tablespace_critical_percent",95,11,100)
+    if warning>=critical: warning,critical=80,95
+    blocking_warning=integer("blocking_warning_seconds",30,5,86400)
+    sql_warning=number("sql_elapsed_warning_seconds",2,0.1,3600)
+    return {
+        "long_session_seconds":integer("long_session_seconds",300,30,86400),
+        "blocking_warning_seconds":blocking_warning,
+        "blocking_critical_seconds":max(blocking_warning+1,integer("blocking_critical_seconds",300,6,604800)),
+        "blocking_critical_sessions":integer("blocking_critical_sessions",3,2,100),
+        "sql_elapsed_warning_seconds":sql_warning,
+        "sql_elapsed_critical_seconds":max(sql_warning+0.1,number("sql_elapsed_critical_seconds",10,0.2,86400)),
+        "sql_regression_percent":number("sql_regression_percent",25,5,1000),
+        "segment_growth_warning_percent":number("segment_growth_warning_percent",10,1,1000),
+        "segment_growth_warning_bytes":integer("segment_growth_warning_bytes",67108864,1048576,2**50),
+        "segment_growth_critical_percent":number("segment_growth_critical_percent",50,2,10000),
+        "segment_growth_critical_bytes":integer("segment_growth_critical_bytes",1073741824,1048577,2**50),
+        "tablespace_warning_percent":warning,
+        "tablespace_critical_percent":critical,
+        "min_sql_executions":integer("min_sql_executions",3,1,100000),
+        "query_timeout_ms":integer("query_timeout_ms",3000,250,30000),
+    }
+
+
 def _normalize_automation_job_payload(payload: Dict) -> Dict:
     profiles = config_loader.load_connections()
     selected_profile = _resolve_profile_key(payload.get("profile"), profiles)
@@ -533,7 +600,7 @@ def _normalize_automation_job_payload(payload: Dict) -> Dict:
         raise HTTPException(status_code=404, detail="Perfil no trobat")
 
     audit_type = (payload.get("audit_type") or "").strip().lower()
-    if audit_type not in {"deep_scan", "obsolets", "post_crq", "post_crq_distribution"}:
+    if audit_type not in {"deep_scan", "obsolets", "post_crq", "post_crq_distribution", "oracle_diagnostics"}:
         raise HTTPException(status_code=400, detail="Tipus d'auditoria no valid")
 
     schedule_type = (payload.get("schedule_type") or "once").strip().lower()
@@ -575,6 +642,9 @@ def _normalize_automation_job_payload(payload: Dict) -> Dict:
             raise HTTPException(status_code=400, detail="Cal generar almenys un tipus de report per al job")
     elif audit_type == "post_crq":
         job_config = _normalize_post_crq_job_config(payload)
+    elif audit_type == "oracle_diagnostics":
+        job_config={**(payload.get("job_config") or {}),"diagnostic_options":_normalize_oracle_diagnostic_options(payload.get("diagnostic_options") or (payload.get("job_config") or {}).get("diagnostic_options"))}
+        report_format="markdown"
     else:
         job_config = payload.get("job_config") or {}
 
@@ -1079,6 +1149,18 @@ async def run_post_crq(payload: Dict = Body(...)):
         return _run_post_crq_with_evidence(dbm, selected_profile, payload)
 
     return await _run_with_oracle_profile("run_post_crq", payload.get("profile"), operation)
+
+
+@app.post("/api/audit/oracle-diagnostics/run")
+async def run_oracle_diagnostics_api(payload: Dict = Body(...)):
+    async def operation(selected_profile,dbm):
+        return _run_oracle_diagnostics_with_evidence(dbm,selected_profile,payload)
+    return await _run_with_oracle_profile("run_oracle_diagnostics",payload.get("profile"),operation)
+
+
+@app.get("/api/oracle-diagnostics/{database_id}/history")
+def get_oracle_diagnostic_history(database_id: str, category: Optional[str] = None, limit: int = 200):
+    return _run_with_internal_http_error("oracle_diagnostic_history",lambda:audit_evidence_service.diagnostic_history(database_id,category=category,limit=limit))
 
 
 @app.get("/api/audit-runs")

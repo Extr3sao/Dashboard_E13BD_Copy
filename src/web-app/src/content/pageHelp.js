@@ -321,6 +321,34 @@ export const PAGE_HELP_CONTENT = {
       'Incluye una recomendación concreta para que otra persona entienda el siguiente paso sin reabrir toda la investigación.',
     ],
   }),
+  oracleDiagnostics: guide({
+    title: 'Diagnòstics Oracle',
+    summary: 'Observacions Oracle read-only que uneixen sessions, blocking, SQL, plans, estadístiques, segments i capacitat amb AuditRuns persistents.',
+    purpose: 'Permetre al DBA veure què s’ha observat, quin és l’abast de cobertura, què ha canviat i quina comprovació pot fer després, sense remediació automàtica.',
+    highlights: [
+      { label: 'Entrades clau', value: 'Perfil Oracle, capacitats per sessió, llindars governats i historial de mostres redacted' },
+      { label: 'Motor', value: '`oracle_diagnostics.py` + AuditRun/RuleResult E13DB-012 + FindingStore/Investigations' },
+      { label: 'Sortida', value: 'Facts timestamped, Findings lifecycle, Red Flags/Alerts i limitations explícites' },
+    ],
+    actions: [
+      action('Run read-only diagnostics', 'Executa mostres bounded. La query SQL i els literals no s’emmagatzemen.', 'PlayCircle'),
+      action('Review coverage', 'UNKNOWN, SKIPPED o privilegis insuficients no equivalen a un resultat sa.', 'ShieldCheck'),
+      action('Open a Finding', 'Navega des d’una observació fins a la seva evidència i historial.', 'Search'),
+      action('Open an Investigation', 'Revisa facts, correlacions i hipòtesis que mai no es confirmen automàticament.', 'Lightbulb'),
+    ],
+    workflow: [
+      step('Confirma el target', 'Tria el perfil Oracle; la visibilitat RAC/CDB es reporta per la connexió efectiva.'),
+      step('Executa o espera el job', 'Manual i scheduler comparteixen el pipeline durable d’AuditRun.'),
+      step('Revisa l’evidència', 'Sessió/bloqueig, SQL_ID, plan hash, estadístiques i capacitat mostren identitat i timestamp.'),
+      step('Segueix el Finding', 'Needs Attention i Investigations reutilitzen els Findings; una hipòtesi no és una causa confirmada.'),
+    ],
+    architecture: {
+      components: ['`src/api/oracle_diagnostics.py` executa queries allow-listed, bounded i read-only.', '`AuditEvidenceService` guarda snapshots, RuleResults i DiagnosticObservations; la reconciliació existent actualitza Findings.', '`InvestigationsView` mostra facts, correlacions i recomanacions basats en occurrences redacted.'],
+      dataSources: ['Oracle dynamic performance views i DBA dictionary views segons capability snapshot.', '`oracle_diagnostic_observations` per comparacions històriques bounded.', 'AWR/ASH no s’interroguen; la llicència i privilege attestation es mostren separadament.'],
+    },
+    limits: ['Una mostra de sessió no prova progrés ni bloqueig continu.', 'Mètriques SQL acumulades només es comparen quan els comptadors creixen sense reset.', 'No hi ha forecasting de capacitat sense prou mostres.', 'Un pla diferent és un fet; no és prova de regressió ni causa.'],
+    help: 'Consulteu els documents d’Oracle diagnostics i privileges per a la llista de vistes i grants mínims.',
+  }),
   postCrqAudit: guide({
     title: 'Auditoria de canvis',
     summary: 'Pantalla central para ejecutar checks post-CRQ, ajustar criticidad y concurrencia, y revisar el informe funcional y técnico resultante.',

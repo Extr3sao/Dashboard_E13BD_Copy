@@ -18,6 +18,23 @@ let schemaLotRowSequence = 0;
 let uiRowSequence = 0;
 export const DEFAULT_TEST_RECIPIENT = 'franciscovalladares@gencat.cat';
 const POST_CRQ_ALLOWED_CRITICALITIES = new Set(['CRITIC', 'MITJA', 'BAIX']);
+export const DEFAULT_ORACLE_DIAGNOSTIC_OPTIONS = Object.freeze({
+  long_session_seconds: 300,
+  blocking_warning_seconds: 30,
+  blocking_critical_seconds: 300,
+  blocking_critical_sessions: 3,
+  sql_elapsed_warning_seconds: 2,
+  sql_elapsed_critical_seconds: 10,
+  sql_regression_percent: 25,
+  segment_growth_warning_percent: 10,
+  segment_growth_warning_bytes: 67108864,
+  segment_growth_critical_percent: 50,
+  segment_growth_critical_bytes: 1073741824,
+  tablespace_warning_percent: 80,
+  tablespace_critical_percent: 95,
+  min_sql_executions: 3,
+  query_timeout_ms: 3000,
+});
 
 export function defaultStartAt() {
   const value = new Date(Date.now() + 60 * 60 * 1000);
@@ -266,6 +283,7 @@ export function getSchemaLotValidation(items) {
 
 export function buildPayload(form) {
   const isDistribution = form.audit_type === 'post_crq_distribution';
+  const isOracleDiagnostics = form.audit_type === 'oracle_diagnostics';
   const selectedDeliveryOptions = Array.from(new Set(
     (Array.isArray(form.delivery_targets) ? form.delivery_targets : [])
       .map((item) => String(item || '').trim().toLowerCase())
@@ -286,7 +304,7 @@ export function buildPayload(form) {
     scheduler_options: ['post_crq', 'post_crq_distribution'].includes(form.audit_type)
       ? normalizePostCrqSchedulerOptions(form.scheduler_options)
       : {},
-    report_format: isDistribution ? 'pdf' : form.report_format,
+    report_format: isDistribution ? 'pdf' : isOracleDiagnostics ? 'markdown' : form.report_format,
     schedule_type: form.schedule_type,
     schedule_config: { start_at: form.start_at },
     timeout_seconds: Number(form.timeout_seconds || 300),
@@ -315,7 +333,7 @@ export function buildPayload(form) {
         test_mode: testMode,
         override_recipients: testMode ? splitCsv(form.delivery_override_recipients) : [],
       },
-    } : {},
+    } : isOracleDiagnostics ? { diagnostic_options: { ...DEFAULT_ORACLE_DIAGNOSTIC_OPTIONS, ...(form.diagnostic_options || {}) } } : {},
   };
 }
 
@@ -334,6 +352,7 @@ export function emptyForm(profile) {
     schedule_type: 'weekly',
     start_at: defaultStartAt(),
     timeout_seconds: 300,
+    diagnostic_options: { ...DEFAULT_ORACLE_DIAGNOSTIC_OPTIONS },
     email_enabled: true,
     email_recipients: '',
     ...defaultDistributionConfig(),
@@ -397,6 +416,7 @@ export function formFromJob(job) {
     timeout_seconds: Number(job.timeout_seconds || 300),
     email_enabled: !!email.enabled,
     email_recipients: ((email.config || {}).recipients || []).join(', '),
+    diagnostic_options: { ...DEFAULT_ORACLE_DIAGNOSTIC_OPTIONS, ...(distribution.diagnostic_options || {}) },
     ...defaultDistributionConfig(),
     lot_scope_mode: lotScope.mode || 'all',
     selected_lots: selectedLotsForm,

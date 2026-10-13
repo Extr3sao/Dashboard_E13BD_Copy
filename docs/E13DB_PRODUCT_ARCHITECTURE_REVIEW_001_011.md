@@ -235,3 +235,27 @@ Evidence and validation on the review branch:
 
 The source baseline passed through E13DB-011 before review; this review did not
 rewrite or alter `main`.
+
+## Subsequent milestone implementation — E13DB-012/013
+
+This review is historical and describes the 001–011 baseline. E13DB-012 was
+subsequently delivered at `7be7f228b8404a2e910c01e311ca7c07502bac4a` with a
+durable AuditRun/RuleResult and reconciliation contract. E13DB-013 is implemented
+on `feature/e13db-013-oracle-deep-diagnostics` from that SHA.
+
+The 013 diagnostic boundary is `src/api/oracle_diagnostics.py`: a bounded,
+read-only Oracle rule pack produces normalized RuleResults, redacted diagnostic
+observations and object/session Finding envelopes. `AuditEvidenceService` stores
+those observations alongside each AuditRun and sends the same data through the
+existing FindingStore, RedFlag, Alert and Investigation projections. There is no
+second incident store. Oracle visibility is scoped to the effective current
+instance/container; RAC-dependent rules require matching GV$ capability.
+
+The new operator route is the Database Audit **Diagnòstics Oracle** tab. Manual
+runs and scheduled `oracle_diagnostics` jobs use the same runner. Fixtures test
+blocking, plan changes, privilege loss, capacity lifecycle, retention and
+replay. The Playwright real-backend smoke uses isolated SQLite plus a seeded
+diagnostic fixture; it validates browser-to-API-to-persisted-evidence navigation,
+not a live Oracle connection. Oracle server syntax, grants, license attestations
+and real RAC/CDB behavior remain `REAL_ORACLE_NOT_VERIFIED` until tested against
+a non-production Oracle target.
