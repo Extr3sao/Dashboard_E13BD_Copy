@@ -1159,8 +1159,8 @@ async def run_oracle_diagnostics_api(payload: Dict = Body(...)):
 
 
 @app.get("/api/oracle-diagnostics/{database_id}/history")
-def get_oracle_diagnostic_history(database_id: str, category: Optional[str] = None, limit: int = 200):
-    return _run_with_internal_http_error("oracle_diagnostic_history",lambda:audit_evidence_service.diagnostic_history(database_id,category=category,limit=limit))
+def get_oracle_diagnostic_history(database_id: str, category: Optional[str] = None, limit: int = 200, offset: int = 0):
+    return _run_with_internal_http_error("oracle_diagnostic_history",lambda:audit_evidence_service.diagnostic_history(database_id,category=category,limit=limit,offset=offset))
 
 
 @app.get("/api/audit-runs")

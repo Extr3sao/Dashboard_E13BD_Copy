@@ -33,6 +33,7 @@ CAPABILITY_RULES = {
     "ORACLE_PLAN_DETAILS": ("SQL_PLAN_VISIBILITY",),
     "ORACLE_OBJECT_STATISTICS": ("SQL_PLAN_VISIBILITY", "STATISTICS_VISIBILITY"),
     "ORACLE_CAPACITY": ("STORAGE_VISIBILITY",),
+    "ORACLE_CAPACITY_MAX": ("STORAGE_VISIBILITY",),
     "ORACLE_TEMP_CAPACITY": ("TEMP_STORAGE_VISIBILITY", "TEMPFILE_VISIBILITY"),
     "ORACLE_SEGMENT_GROWTH": ("SEGMENT_VISIBILITY",),
     "ORACLE_RAC_SCOPE": ("RAC_VISIBILITY",),
@@ -47,6 +48,7 @@ RULE_TITLES = {
     "ORACLE_PLAN_DETAILS": "Oracle execution-plan steps",
     "ORACLE_OBJECT_STATISTICS": "Statistics for workload-related objects",
     "ORACLE_CAPACITY": "Oracle tablespace capacity",
+    "ORACLE_CAPACITY_MAX": "Oracle effective tablespace capacity",
     "ORACLE_TEMP_CAPACITY": "Oracle temporary tablespace capacity",
     "ORACLE_SEGMENT_GROWTH": "Observed Oracle segment growth",
     "ORACLE_RAC_SCOPE": "Oracle RAC visibility scope",
@@ -120,14 +122,14 @@ def _rule(rule_id, query_identity, *, severity="MEDIUM", required_capabilities=N
     )
 
 
-def _result(definition,database_id,status,started,duration,summary,metrics=None,evidence=None,error=None):
+def _result(definition,database_id,status,started,duration,summary,metrics=None,evidence=None,error=None,coverage_meaning=None):
     finished=started+max(0.0,duration)
     return RuleResult(
         rule_id=definition.rule_id,database_id=database_id,status=status,severity=definition.default_severity,
         started_at=started,finished_at=finished,duration=max(0.0,duration),summary=str(summary or "")[:500],
         metrics=metrics or {},evidence=redact_evidence(evidence or {}),error=redact_evidence(error) if error else None,
         recommendation=definition.recommendation,rule_version=definition.version,definition_hash=definition.definition_hash,
-        coverage_meaning="not_evaluated" if status is RuleStatus.SKIPPED else "evaluation_error" if status is RuleStatus.ERROR else "evaluated",
+        coverage_meaning=coverage_meaning or ("not_evaluated" if status is RuleStatus.SKIPPED else "evaluation_error" if status is RuleStatus.ERROR else "evaluated"),
     ).to_dict()
 
 
@@ -360,19 +362,22 @@ def _statistics_query(sql_ids,capabilities,multi_instance=False,container_id=Non
 def _tablespace_query(capabilities):
     con="TO_NUMBER(SYS_CONTEXT('USERENV','CON_ID'))" if capabilities.get("CDB_VISIBILITY")=="AVAILABLE" else "CAST(NULL AS NUMBER)"
     sql=f"""SELECT * FROM (
-      SELECT {con} AS con_id,t.tablespace_name,t.contents,
-             NVL(df.allocated_bytes,0) AS allocated_bytes,NVL(df.max_bytes,0) AS max_bytes,
-             NVL(fs.free_bytes,0) AS free_bytes,
-             GREATEST(NVL(df.allocated_bytes,0)-NVL(fs.free_bytes,0),0) AS used_bytes,
-             CASE WHEN NVL(df.allocated_bytes,0)>0 THEN ROUND(100*(df.allocated_bytes-NVL(fs.free_bytes,0))/df.allocated_bytes,2) ELSE 0 END AS used_percent,
-             CASE WHEN NVL(df.max_bytes,0)>0 THEN ROUND(100*(df.allocated_bytes-NVL(fs.free_bytes,0))/df.max_bytes,2) ELSE 0 END AS max_capacity_percent,
-             NVL(df.file_count,0) AS file_count,NVL(df.autoextend_files,0) AS autoextend_files
-      FROM dba_tablespaces t
+       SELECT {con} AS con_id,t.tablespace_name,t.contents,
+              NVL(df.allocated_bytes,0) AS allocated_bytes,NVL(df.max_bytes,0) AS max_bytes,
+              NVL(fs.free_bytes,0) AS free_bytes,
+              GREATEST(NVL(df.allocated_bytes,0)-NVL(fs.free_bytes,0),0) AS used_bytes,
+              CASE WHEN NVL(df.allocated_bytes,0)>0 THEN ROUND(100*(df.allocated_bytes-NVL(fs.free_bytes,0))/df.allocated_bytes,2) ELSE NULL END AS used_percent,
+              CASE WHEN NVL(df.max_bytes,0)>0 THEN ROUND(100*(df.allocated_bytes-NVL(fs.free_bytes,0))/df.max_bytes,2) ELSE NULL END AS max_capacity_percent,
+              NVL(df.file_count,0) AS file_count,NVL(df.autoextend_files,0) AS autoextend_files,
+              uq.bytes AS quota_used_bytes,CASE WHEN uq.max_bytes=-1 THEN NULL ELSE uq.max_bytes END AS quota_limit_bytes,
+              CASE WHEN uq.max_bytes=-1 THEN 1 ELSE 0 END AS quota_unlimited
+       FROM dba_tablespaces t
       LEFT JOIN (SELECT tablespace_name,SUM(bytes) allocated_bytes,
                  SUM(CASE WHEN autoextensible='YES' THEN GREATEST(maxbytes,bytes) ELSE bytes END) max_bytes,
-                 COUNT(*) file_count,SUM(CASE WHEN autoextensible='YES' THEN 1 ELSE 0 END) autoextend_files
-                 FROM dba_data_files GROUP BY tablespace_name) df ON df.tablespace_name=t.tablespace_name
-      LEFT JOIN (SELECT tablespace_name,SUM(bytes) free_bytes FROM dba_free_space GROUP BY tablespace_name) fs ON fs.tablespace_name=t.tablespace_name
+                  COUNT(*) file_count,SUM(CASE WHEN autoextensible='YES' THEN 1 ELSE 0 END) autoextend_files
+                  FROM dba_data_files GROUP BY tablespace_name) df ON df.tablespace_name=t.tablespace_name
+       LEFT JOIN (SELECT tablespace_name,SUM(bytes) free_bytes FROM dba_free_space GROUP BY tablespace_name) fs ON fs.tablespace_name=t.tablespace_name
+       LEFT JOIN user_ts_quotas uq ON uq.tablespace_name=t.tablespace_name
       WHERE t.contents IN ('PERMANENT','UNDO')
       ORDER BY used_percent DESC
     ) WHERE ROWNUM<=:max_rows"""
@@ -405,14 +410,16 @@ def _segment_query(object_refs):
 def _temporary_tablespace_query(capabilities):
     con="TO_NUMBER(SYS_CONTEXT('USERENV','CON_ID'))" if capabilities.get("CDB_VISIBILITY")=="AVAILABLE" else "CAST(NULL AS NUMBER)"
     sql=f"""SELECT * FROM (
-      SELECT {con} AS con_id,t.tablespace_name,t.tablespace_size AS allocated_bytes,
-             NVL(f.max_bytes,t.tablespace_size) AS max_bytes,t.free_space AS free_bytes,
-             GREATEST(t.tablespace_size-t.free_space,0) AS used_bytes,
-             CASE WHEN t.tablespace_size>0 THEN ROUND(100*(t.tablespace_size-t.free_space)/t.tablespace_size,2) ELSE 0 END AS used_percent,
-             CASE WHEN NVL(f.max_bytes,0)>0 THEN ROUND(100*(t.tablespace_size-t.free_space)/f.max_bytes,2) ELSE 0 END AS max_capacity_percent,
+       SELECT {con} AS con_id,t.tablespace_name,NVL(f.allocated_bytes,0) AS allocated_bytes,
+              NVL(f.max_bytes,0) AS max_bytes,
+              GREATEST(NVL(f.allocated_bytes,0)-NVL(t.allocated_space,0),0) AS free_bytes,
+              GREATEST(NVL(t.allocated_space,0),0) AS used_bytes,
+              CASE WHEN NVL(f.allocated_bytes,0)>0 THEN ROUND(100*t.allocated_space/f.allocated_bytes,2) ELSE NULL END AS used_percent,
+              CASE WHEN NVL(f.max_bytes,0)>0 THEN ROUND(100*t.allocated_space/f.max_bytes,2) ELSE NULL END AS max_capacity_percent,
              t.allocated_space,f.file_count,f.autoextend_files
       FROM dba_temp_free_space t
-      LEFT JOIN (SELECT tablespace_name,SUM(CASE WHEN autoextensible='YES' THEN GREATEST(maxbytes,bytes) ELSE bytes END) max_bytes,
+       LEFT JOIN (SELECT tablespace_name,SUM(bytes) allocated_bytes,
+                  SUM(CASE WHEN autoextensible='YES' THEN GREATEST(maxbytes,bytes) ELSE bytes END) max_bytes,
                  COUNT(*) file_count,SUM(CASE WHEN autoextensible='YES' THEN 1 ELSE 0 END) autoextend_files
                  FROM dba_temp_files GROUP BY tablespace_name) f ON f.tablespace_name=t.tablespace_name
       ORDER BY used_percent DESC
@@ -682,60 +689,117 @@ def run_oracle_diagnostics(db_manager,database_id,*,audit_context=None,options=N
 
     capacity_caps=CAPABILITY_RULES["ORACLE_CAPACITY"]+(("CDB_VISIBILITY",) if cdb_scope_unknown else ())
     capacity_definition=_rule("ORACLE_CAPACITY","bounded-tablespace-capacity-v1",severity="MEDIUM",required_capabilities=capacity_caps,recommendation="Review available space, datafile autoextend limits and approved capacity plans; E13DB does not resize files.")
+    max_definition=_rule("ORACLE_CAPACITY_MAX","effective-tablespace-capacity-v1",severity="MEDIUM",required_capabilities=capacity_caps,recommendation="Review remaining datafile autoextend headroom and current quotas; physical storage limits require external telemetry.")
+    definitions.append(max_definition)
     capacity_started=time.time(); capacity_sql,capacity_binds=_tablespace_query(capabilities["capabilities"])
     capacity_rows=execute("ORACLE_CAPACITY",capacity_definition,capacity_sql,capacity_binds,capacity_caps,max_rows=MAX_TABLESPACE_ROWS)
-    capacity_findings=[]
+    capacity_findings=[]; effective_capacity_findings=[]; capacity_unknown=[]
     if capacity_rows is not None:
         for index,row in enumerate(capacity_rows):
             name=_safe_name(row.get("tablespace_name")); con=_int(row.get("con_id"),None)
             if not name: continue
             allocated=_number(row.get("allocated_bytes")); free=_number(row.get("free_bytes")); used=max(0,allocated-free)
-            used_percent=100*used/allocated if allocated>0 else 0.0
-            max_bytes=_number(row.get("max_bytes")); max_capacity_percent=100*used/max_bytes if max_bytes>0 else used_percent
+            file_count=_int(row.get("file_count")); max_bytes=_number(row.get("max_bytes"),-1); free_known=row.get("free_bytes") is not None
+            capacity_known=file_count>0 and allocated>0 and max_bytes>0 and free_known
+            used_percent=100*used/allocated if allocated>0 else None
+            max_capacity_percent=100*used/max_bytes if max_bytes>0 else None
+            headroom=max(0,max_bytes-allocated) if capacity_known and _int(row.get("autoextend_files"))>0 else 0 if capacity_known else None
+            quota_used=_number(row.get("quota_used_bytes"),None); quota_limit=_number(row.get("quota_limit_bytes"),None)
+            quota_used_percent=100*quota_used/quota_limit if quota_used is not None and quota_limit is not None and quota_limit>0 else None
             identity=f"capacity:con={con or 0}:tablespace={name}"
             previous_capacity=previous("CAPACITY",identity); old_used=_number((previous_capacity or {}).get("metrics",{}).get("used_bytes"),-1)
-            comparable=bool(previous_capacity and used>=0 and old_used>=0)
-            metrics={"allocated_bytes":allocated,"used_bytes":used,"free_bytes":free,"max_bytes":max_bytes,"used_percent":used_percent,"max_capacity_percent":max_capacity_percent,"file_count":_int(row.get("file_count")),"autoextend_files":_int(row.get("autoextend_files")),"growth_bytes":max(0,used-old_used) if comparable else 0,"sample_count":_int((previous_capacity or {}).get("metrics",{}).get("sample_count"))+1,"value":used_percent,"comparison_direction":"higher_is_worse"}
-            evidence={"tablespace":name,"con_id":con if con is not None else capabilities.get("current_container_id"),"contents":str(row.get("contents") or "")[:32],"autoextensible":metrics["autoextend_files"]>0,"capacity_comparable":comparable,"prior_audit_run_id":(previous_capacity or {}).get("audit_run_id"),"first_observed_at":(previous_capacity or {}).get("evidence",{}).get("first_observed_at",now),"last_observed_at":now}
+            comparable=bool(capacity_known and previous_capacity and used>=0 and old_used>=0)
+            metrics={"allocated_bytes":allocated if capacity_known else None,"used_bytes":used if capacity_known else None,"free_bytes":free if capacity_known else None,"max_bytes":max_bytes if capacity_known else None,"used_percent":used_percent,"assigned_space_used_percent":used_percent,"max_capacity_percent":max_capacity_percent,"effective_capacity_used_percent":max_capacity_percent,"autoextend_headroom_bytes":headroom,"effective_free_capacity_bytes":free+headroom if capacity_known else None,"quota_used_bytes":quota_used,"quota_limit_bytes":quota_limit,"quota_used_percent":quota_used_percent,"quota_unlimited":bool(_int(row.get("quota_unlimited"))),"physical_capacity_limit_bytes":None,"capacity_known":capacity_known,"file_count":file_count,"autoextend_files":_int(row.get("autoextend_files")),"growth_bytes":max(0,used-old_used) if comparable else 0,"sample_count":_int((previous_capacity or {}).get("metrics",{}).get("sample_count"))+1,"value":used_percent,"comparison_direction":"higher_is_worse"}
+            evidence={"tablespace":name,"con_id":con if con is not None else capabilities.get("current_container_id"),"contents":str(row.get("contents") or "")[:32],"warning_percent":thresholds["tablespace_warning_percent"],"critical_percent":thresholds["tablespace_critical_percent"],"autoextensible":metrics["autoextend_files"]>0,"capacity_comparable":comparable,"capacity_unknown_reason":None if capacity_known else "DATAFILES_OR_CAPACITY_VALUES_UNAVAILABLE","quota_scope":"connected Oracle user only; other owners are not assessed","physical_capacity_status":"UNKNOWN_NOT_EXPOSED_BY_CURRENT_ORACLE_DICTIONARY_PROBES","prior_audit_run_id":(previous_capacity or {}).get("audit_run_id"),"first_observed_at":(previous_capacity or {}).get("evidence",{}).get("first_observed_at",now),"last_observed_at":now}
             observations.append(_observation("CAPACITY",identity,now=now,con_id=con if con is not None else capabilities.get("current_container_id"),owner="TABLESPACE",object_name=name,metrics=metrics,evidence=evidence))
-            if used_percent>=thresholds["tablespace_warning_percent"]:
+            if not capacity_known:
+                capacity_unknown.append(name)
+            elif used_percent>=thresholds["tablespace_warning_percent"]:
                 capacity_findings.append({"name":name,"metrics":metrics,"evidence":evidence,"severity":"CRITIC" if used_percent>=thresholds["tablespace_critical_percent"] else "MITJA"})
+            if capacity_known and max_capacity_percent>=thresholds["tablespace_warning_percent"] and abs(max_capacity_percent-used_percent)>0.01:
+                effective_capacity_findings.append({"name":name,"metrics":metrics,"evidence":evidence,"severity":"CRITIC" if max_capacity_percent>=thresholds["tablespace_critical_percent"] else "MITJA"})
         for index,item in enumerate(capacity_findings):
             object_name=item["name"]+(f"@CON{item['evidence'].get('con_id')}" if item["evidence"].get("con_id") is not None else "")
             envelopes.append(_envelope("ORACLE_CAPACITY",f"Tablespace {item['name']} is {item['metrics']['used_percent']:.1f}% allocated",owner="TABLESPACE",object_name=object_name,object_type="TABLESPACE",severity=item["severity"],evidence={"tablespace":item["name"],**item["metrics"],**item["evidence"]},index=index))
-        results.append(_result(capacity_definition,database_id,RuleStatus.FAIL if any(item["severity"]=="CRITIC" for item in capacity_findings) else RuleStatus.WARN if capacity_findings else RuleStatus.PASS,capacity_started,sum(item["duration_seconds"] for item in query_metrics if item["rule_id"]=="ORACLE_CAPACITY"),f"Observed {len(capacity_rows)} permanent/undo tablespaces; {len(capacity_findings)} crossed configured capacity warning/critical thresholds.",metrics={"row_count":len(capacity_rows),"tablespaces_over_warning":len(capacity_findings),"value":max((item["metrics"]["used_percent"] for item in capacity_findings),default=0),"comparison_direction":"higher_is_worse"},evidence={"warning_percent":thresholds["tablespace_warning_percent"],"critical_percent":thresholds["tablespace_critical_percent"],"includes":"PERMANENT and UNDO; TEMP not included in this rule version"}))
-    elif not any(result["rule_id"]=="ORACLE_CAPACITY" for result in results): add_skip("ORACLE_CAPACITY","STORAGE_UNAVAILABLE",capacity_definition)
-
+        capacity_status=RuleStatus.SKIPPED if capacity_unknown else RuleStatus.FAIL if any(item["severity"]=="CRITIC" for item in capacity_findings) else RuleStatus.WARN if capacity_findings else RuleStatus.PASS
+        results.append(_result(capacity_definition,database_id,capacity_status,capacity_started,sum(item["duration_seconds"] for item in query_metrics if item["rule_id"]=="ORACLE_CAPACITY"),f"Observed {len(capacity_rows)} permanent/undo tablespaces; {len(capacity_findings)} crossed assigned-space thresholds; {len(capacity_unknown)} have unknown capacity.",metrics={"row_count":len(capacity_rows),"tablespaces_over_warning":len(capacity_findings),"unknown_capacity_count":len(capacity_unknown),"value":max((item["metrics"]["used_percent"] for item in capacity_findings),default=0),"comparison_direction":"higher_is_worse"},evidence={"warning_percent":thresholds["tablespace_warning_percent"],"critical_percent":thresholds["tablespace_critical_percent"],"includes":"PERMANENT and UNDO; TEMP reported separately","capacity_basis":"assigned allocation and effective maximum are reported separately","unknown_tablespaces":capacity_unknown},coverage_meaning="partial_visibility" if capacity_unknown else "evaluated"))
+        for index,item in enumerate(effective_capacity_findings):
+            object_name=item["name"]+(f"@CON{item['evidence'].get('con_id')}" if item["evidence"].get("con_id") is not None else "")
+            envelopes.append(_envelope("ORACLE_CAPACITY_MAX",f"Tablespace {item['name']} uses {item['metrics']['max_capacity_percent']:.1f}% of effective maximum capacity",owner="TABLESPACE",object_name=object_name,object_type="TABLESPACE",severity=item["severity"],evidence={"tablespace":item["name"],**item["metrics"],**item["evidence"]},index=index))
+        max_status=RuleStatus.SKIPPED if capacity_unknown else RuleStatus.FAIL if any(item["severity"]=="CRITIC" for item in effective_capacity_findings) else RuleStatus.WARN if effective_capacity_findings else RuleStatus.PASS
+        results.append(_result(max_definition,database_id,max_status,capacity_started,0,f"{len(effective_capacity_findings)} tablespaces crossed effective maximum-capacity thresholds.",metrics={"tablespaces_over_warning":len(effective_capacity_findings),"unknown_capacity_count":len(capacity_unknown),"value":max((item["metrics"]["max_capacity_percent"] for item in effective_capacity_findings),default=0),"comparison_direction":"higher_is_worse"},evidence={"warning_percent":thresholds["tablespace_warning_percent"],"critical_percent":thresholds["tablespace_critical_percent"],"threshold_basis":"effective maximum capacity including configured autoextend limits","unknown_tablespaces":capacity_unknown},coverage_meaning="partial_visibility" if capacity_unknown else "evaluated"))
+    else:
+        base_result=next((item for item in results if item["rule_id"]=="ORACLE_CAPACITY"),None)
+        inherited_status=base_result["status"] if base_result else RuleStatus.SKIPPED
+        max_status=RuleStatus.ERROR if inherited_status==RuleStatus.ERROR.value else RuleStatus.SKIPPED
+        results.append(_result(max_definition,database_id,max_status,capacity_started,0,"Effective maximum capacity was not evaluated because the assigned-capacity evidence is unavailable.",metrics={"unknown_capacity_count":None},evidence={"capacity_basis":"not_evaluated","inherited_status":inherited_status},error=(base_result or {}).get("error"),coverage_meaning="evaluation_error" if max_status is RuleStatus.ERROR else "not_evaluated"))
     temp_caps=CAPABILITY_RULES["ORACLE_TEMP_CAPACITY"]+(("CDB_VISIBILITY",) if cdb_scope_unknown else ())
     temp_definition=_rule("ORACLE_TEMP_CAPACITY","bounded-dba-temp-free-space-v1",severity="MEDIUM",required_capabilities=temp_caps,recommendation="Review active temporary-space consumers and tempfile limits; E13DB does not resize files or cancel sessions.")
     temp_sql,temp_binds=_temporary_tablespace_query(capability_map)
     temp_started=time.time(); temp_rows=execute("ORACLE_TEMP_CAPACITY",temp_definition,temp_sql,temp_binds,temp_caps,max_rows=MAX_TEMP_ROWS)
+    temp_capacity_unknown=[]
     if temp_rows is not None:
         temp_findings=[]
         for index,row in enumerate(temp_rows):
             name=_safe_name(row.get("tablespace_name")); con=_int(row.get("con_id"),None)
             if not name: continue
-            size=_number(row.get("allocated_bytes")); free=_number(row.get("free_bytes")); used=max(0,size-free)
-            used_percent=100*used/size if size>0 else 0.0
-            max_bytes=_number(row.get("max_bytes"),size); max_capacity_percent=100*used/max_bytes if max_bytes>0 else used_percent
+            size=_number(row.get("allocated_bytes")); free=_number(row.get("free_bytes")); used=max(0,_number(row.get("used_bytes"),size-free))
+            max_bytes=_number(row.get("max_bytes"),-1); capacity_known=size>0 and max_bytes>0
+            used_percent=100*used/size if size>0 else None
+            max_capacity_percent=100*used/max_bytes if max_bytes>0 else None
+            headroom=max(0,max_bytes-size) if capacity_known and _int(row.get("autoextend_files"))>0 else 0 if capacity_known else None
             identity=f"capacity:con={con or 0}:temp_tablespace={name}"
-            metrics={"allocated_bytes":size,"used_bytes":used,"free_bytes":free,"max_bytes":max_bytes,"used_percent":used_percent,"max_capacity_percent":max_capacity_percent,"file_count":_int(row.get("file_count")),"autoextend_files":_int(row.get("autoextend_files")),"growth_bytes":0,"value":used_percent,"comparison_direction":"higher_is_worse"}
-            evidence={"tablespace":name,"con_id":con if con is not None else capabilities.get("current_container_id"),"contents":"TEMPORARY","capacity_basis":"DBA_TEMP_FREE_SPACE","allocated_space_bytes":_number(row.get("allocated_space")),"autoextensible":metrics["autoextend_files"]>0}
+            metrics={"allocated_bytes":size if capacity_known else None,"used_bytes":used if capacity_known else None,"free_bytes":free if capacity_known else None,"max_bytes":max_bytes if capacity_known else None,"used_percent":used_percent,"assigned_space_used_percent":used_percent,"max_capacity_percent":max_capacity_percent,"effective_capacity_used_percent":max_capacity_percent,"autoextend_headroom_bytes":headroom,"effective_free_capacity_bytes":free+headroom if capacity_known else None,"quota_used_bytes":None,"quota_limit_bytes":None,"quota_used_percent":None,"quota_unlimited":None,"physical_capacity_limit_bytes":None,"capacity_known":capacity_known,"file_count":_int(row.get("file_count")),"autoextend_files":_int(row.get("autoextend_files")),"growth_bytes":0,"value":used_percent,"comparison_direction":"higher_is_worse"}
+            evidence={"tablespace":name,"con_id":con if con is not None else capabilities.get("current_container_id"),"contents":"TEMPORARY","capacity_basis":"DBA_TEMP_FREE_SPACE","warning_percent":thresholds["tablespace_warning_percent"],"critical_percent":thresholds["tablespace_critical_percent"],"capacity_unknown_reason":None if capacity_known else "TEMPFILE_CAPACITY_UNAVAILABLE","allocated_space_bytes":_number(row.get("allocated_space")),"quota_scope":"not applicable to temporary extent capacity","physical_capacity_status":"UNKNOWN_NOT_EXPOSED_BY_CURRENT_ORACLE_DICTIONARY_PROBES","autoextensible":metrics["autoextend_files"]>0}
             observations.append(_observation("CAPACITY",identity,now=now,con_id=con if con is not None else capabilities.get("current_container_id"),owner="TABLESPACE",object_name=name,metrics=metrics,evidence=evidence))
-            if used_percent>=thresholds["tablespace_warning_percent"]:
+            if not capacity_known: temp_capacity_unknown.append(name)
+            if used_percent is not None and used_percent>=thresholds["tablespace_warning_percent"]:
                 temp_findings.append({"name":name,"metrics":metrics,"evidence":evidence,"severity":"CRITIC" if used_percent>=thresholds["tablespace_critical_percent"] else "MITJA"})
         for index,item in enumerate(temp_findings):
             object_name=item["name"]+(f"@CON{item['evidence'].get('con_id')}" if item["evidence"].get("con_id") is not None else "")
             envelopes.append(_envelope("ORACLE_TEMP_CAPACITY",f"Temporary tablespace {item['name']} is {item['metrics']['used_percent']:.1f}% used",owner="TABLESPACE",object_name=object_name,object_type="TEMPORARY TABLESPACE",severity=item["severity"],evidence={"tablespace":item["name"],**item["metrics"],**item["evidence"]},index=index))
-        results.append(_result(temp_definition,database_id,RuleStatus.FAIL if any(item["severity"]=="CRITIC" for item in temp_findings) else RuleStatus.WARN if temp_findings else RuleStatus.PASS,temp_started,sum(item["duration_seconds"] for item in query_metrics if item["rule_id"]=="ORACLE_TEMP_CAPACITY"),f"Observed {len(temp_rows)} temporary tablespace(s); {len(temp_findings)} crossed configured capacity thresholds.",metrics={"row_count":len(temp_rows),"tablespaces_over_warning":len(temp_findings),"value":max((item["metrics"]["used_percent"] for item in temp_findings),default=0),"comparison_direction":"higher_is_worse"},evidence={"warning_percent":thresholds["tablespace_warning_percent"],"critical_percent":thresholds["tablespace_critical_percent"],"tempfile_autoextend_limits":"observed through DBA_TEMP_FILES"}))
+        temp_status=RuleStatus.SKIPPED if temp_capacity_unknown else RuleStatus.FAIL if any(item["severity"]=="CRITIC" for item in temp_findings) else RuleStatus.WARN if temp_findings else RuleStatus.PASS
+        results.append(_result(temp_definition,database_id,temp_status,temp_started,sum(item["duration_seconds"] for item in query_metrics if item["rule_id"]=="ORACLE_TEMP_CAPACITY"),f"Observed {len(temp_rows)} temporary tablespace(s); {len(temp_findings)} crossed configured capacity thresholds; {len(temp_capacity_unknown)} have unknown capacity.",metrics={"row_count":len(temp_rows),"tablespaces_over_warning":len(temp_findings),"unknown_capacity_count":len(temp_capacity_unknown),"value":max((item["metrics"]["used_percent"] for item in temp_findings),default=0),"comparison_direction":"higher_is_worse"},evidence={"warning_percent":thresholds["tablespace_warning_percent"],"critical_percent":thresholds["tablespace_critical_percent"],"tempfile_autoextend_limits":"observed through DBA_TEMP_FILES","unknown_tablespaces":temp_capacity_unknown},coverage_meaning="partial_visibility" if temp_capacity_unknown else "evaluated"))
 
     rule_results=sorted(results,key=lambda item:item["rule_id"])
+    observation_rules={"SESSION":("ORACLE_SESSIONS",),"BLOCKING":("ORACLE_BLOCKING",),"SQL_PERFORMANCE":("ORACLE_SQL_PERFORMANCE",),"PLAN":("ORACLE_PLAN_CHANGES",),"STATISTICS":("ORACLE_OBJECT_STATISTICS",),"SEGMENT_GROWTH":("ORACLE_SEGMENT_GROWTH",),"CAPACITY":("ORACLE_CAPACITY","ORACLE_CAPACITY_MAX","ORACLE_TEMP_CAPACITY")}
+    rule_lookup={item["rule_id"]:item for item in rule_results}
+    severity_rank={"CRITICAL":5,"CRITIC":5,"HIGH":4,"ALT":4,"MEDIUM":3,"MITJA":3,"LOW":2,"BAIXA":2,"INFO":1}
+    for observation in observations:
+        rule_ids=observation_rules.get(observation["category"],())
+        if observation["category"]=="CAPACITY" and observation.get("evidence",{}).get("contents")=="TEMPORARY": rule_ids=("ORACLE_TEMP_CAPACITY",)
+        candidates=[rule_lookup[rule_id] for rule_id in rule_ids if rule_id in rule_lookup]
+        if not candidates: continue
+        primary=candidates[0]
+        observation["evidence"]["rule_status"]=primary["status"]
+        matching=[]
+        for envelope in envelopes:
+            if envelope.get("check_id") not in rule_ids: continue
+            envelope_evidence=envelope.get("evidence") or {}
+            observed_tablespace=observation.get("evidence",{}).get("tablespace")
+            envelope_tablespace=envelope_evidence.get("tablespace")
+            observed_sql_id=observation.get("sql_id")
+            envelope_sql_id=envelope_evidence.get("sql_id")
+            observed_owner=observation.get("evidence",{}).get("object_owner") or observation.get("owner")
+            envelope_owner=envelope_evidence.get("object_owner") or envelope.get("schema")
+            observed_object=observation.get("evidence",{}).get("object_name") or observation.get("object_name")
+            envelope_object=envelope_evidence.get("object_name")
+            observed_partition=observation.get("evidence",{}).get("partition_name")
+            envelope_partition=envelope_evidence.get("partition_name")
+            same_object=bool(observation.get("identity_key") and envelope.get("object_name")==observation["identity_key"])
+            same_object=same_object or bool(observed_object and envelope_object and observed_object==envelope_object and (not observed_owner or not envelope_owner or observed_owner==envelope_owner) and observed_partition==envelope_partition)
+            same_object=same_object or bool(observation["category"]=="CAPACITY" and observed_tablespace and envelope_tablespace and envelope_tablespace==observed_tablespace)
+            same_object=same_object or bool(observed_sql_id and envelope_sql_id and envelope_sql_id==observed_sql_id)
+            if same_object: matching.append(envelope.get("sql_severity"))
+        rule_severity=max((item.get("severity") for item in candidates),key=lambda value:severity_rank.get(str(value).upper(),0))
+        observation["evidence"]["observation_severity"]=max(matching,key=lambda value:severity_rank.get(str(value).upper(),0)) if matching else rule_severity
     rule_pack=hashlib.sha256(json.dumps({"rules":rule_pack_identity(definitions),"diagnostic_options":thresholds,"instance_scope":"RAC" if multi_instance else "CURRENT_INSTANCE","container_id":capabilities.get("current_container_id"),"capabilities":capability_map},sort_keys=True,separators=(",",":"),default=str).encode("utf-8")).hexdigest()
-    summary={"checks_total":len(rule_results),"checks_pass":sum(item["status"]=="PASS" for item in rule_results),"checks_warn":sum(item["status"]=="WARN" for item in rule_results),"checks_fail":sum(item["status"]=="FAIL" for item in rule_results),"checks_error":sum(item["status"]=="ERROR" for item in rule_results),"checks_skipped":sum(item["status"]=="SKIPPED" for item in rule_results),"diagnostic_observations":len(observations),"finding_envelopes":len(envelopes),"query_count":len(query_metrics),"query_budget":8,"query_metrics":query_metrics,"capability_probe_count":capabilities.get("probe_count",0),"capability_discovery_seconds":round(capability_discovery_seconds,3)}
+    failed_query_count=sum(item["status"]=="ERROR" for item in query_metrics)
+    summary={"checks_total":len(rule_results),"checks_pass":sum(item["status"]=="PASS" for item in rule_results),"checks_warn":sum(item["status"]=="WARN" for item in rule_results),"checks_fail":sum(item["status"]=="FAIL" for item in rule_results),"checks_error":sum(item["status"]=="ERROR" for item in rule_results),"checks_skipped":sum(item["status"]=="SKIPPED" for item in rule_results),"diagnostic_observations":len(observations),"finding_envelopes":len(envelopes),"query_count":len(query_metrics),"queries_executed":len(query_metrics),"queries_succeeded":sum(item["status"]=="AVAILABLE" for item in query_metrics),"queries_failed":failed_query_count,"queries_skipped":sum(item["status"]=="SKIPPED" and item["rule_id"]!="ORACLE_CAPACITY_MAX" for item in rule_results),"query_budget":8,"query_metrics":query_metrics,"capability_probe_count":capabilities.get("probe_count",0),"capability_discovery_seconds":round(capability_discovery_seconds,3)}
     connection_class=capabilities.get("connection_class","UNKNOWN")
     audit_state="SUCCESS" if capabilities.get("connection_status")=="AVAILABLE" else "FAILED"
     failure_class={"CONFIGURATION_ERROR":"CONFIGURATION_ERROR","UNREACHABLE":"UNREACHABLE"}.get(connection_class,"ORACLE_CONNECTION_UNKNOWN") if audit_state=="FAILED" else None
-    return {"audit_type":"oracle_diagnostics","audit_state":audit_state,"failure_class":failure_class,"audit_run_id":str(context.get("audit_run_id") or ""),"trigger_type":str(context.get("trigger_type") or "MANUAL").upper(),"trigger_reference":str(context.get("trigger_reference") or ""),"runtime_identity":runtime_identity(),"rule_pack_identity":rule_pack,"capability_snapshot":capabilities,"context":{"profile":str(database_id),"generated_at":now,"diagnostic_options":thresholds,"scope":capabilities.get("cdb_scope") or "connected session's effective Oracle visibility"},"summary":summary,"rule_results":rule_results,"finding_envelopes":envelopes[:500],"diagnostic_observations":observations[:500],"diagnostic_errors":errors,"errors":errors,"executed_checks":[],"query_metrics":query_metrics,"coverage_state":"DEGRADED" if audit_state=="FAILED" or summary["checks_error"] or summary["checks_skipped"] or errors else "FULL"}
+    return {"audit_type":"oracle_diagnostics","audit_state":audit_state,"failure_class":failure_class,"audit_run_id":str(context.get("audit_run_id") or ""),"trigger_type":str(context.get("trigger_type") or "MANUAL").upper(),"trigger_reference":str(context.get("trigger_reference") or ""),"runtime_identity":runtime_identity(),"rule_pack_identity":rule_pack,"capability_snapshot":capabilities,"context":{"profile":str(database_id),"generated_at":now,"diagnostic_options":thresholds,"scope":capabilities.get("cdb_scope") or "connected session's effective Oracle visibility"},"summary":summary,"rule_results":rule_results,"finding_envelopes":envelopes[:500],"diagnostic_observations":observations[:500],"diagnostic_errors":errors,"errors":errors,"executed_checks":[],"query_metrics":query_metrics,"coverage_state":"DEGRADED" if audit_state=="FAILED" or summary["checks_error"] or summary["checks_skipped"] or errors or capacity_unknown or temp_capacity_unknown else "FULL"}
 
 
 def render_diagnostic_markdown(report):

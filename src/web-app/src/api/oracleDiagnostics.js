@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-export async function runOracleDiagnostics(payload) {
-  const response = await axios.post('/api/audit/oracle-diagnostics/run', payload || {});
+export async function runOracleDiagnostics(payload, config = {}) {
+  const response = await axios.post('/api/audit/oracle-diagnostics/run', payload || {}, config);
   return response.data;
 }
 

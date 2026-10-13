@@ -43,8 +43,9 @@ DIAGNOSTIC_METRICS = {
     "cpu_seconds", "buffer_gets", "disk_reads", "rows_processed", "parse_calls", "plan_hash_value",
     "execution_seconds", "execution_cpu_seconds", "buffer_gets_per_execution", "disk_reads_per_execution",
     "rows_per_execution", "elapsed_per_exec_seconds", "interval_elapsed_per_execution_seconds", "statistics_age_days", "num_rows", "blocks", "sample_size", "used_bytes",
-    "free_bytes", "allocated_bytes", "max_bytes", "used_percent", "free_percent", "growth_bytes",
-    "sample_count", "metric_delta_percent", "comparison_comparable", "plan_variant_count", "segment_bytes", "segment_growth_bytes", "growth_percent", "file_count", "autoextend_files", "max_capacity_percent",
+    "free_bytes", "allocated_bytes", "max_bytes", "used_percent", "assigned_space_used_percent", "effective_capacity_used_percent", "max_capacity_percent", "free_percent", "growth_bytes",
+    "autoextend_headroom_bytes", "effective_free_capacity_bytes", "quota_used_bytes", "quota_limit_bytes", "quota_used_percent", "quota_unlimited", "physical_capacity_limit_bytes", "capacity_known",
+    "sample_count", "metric_delta_percent", "comparison_comparable", "plan_variant_count", "segment_bytes", "segment_growth_bytes", "growth_percent", "file_count", "autoextend_files",
 }
 DIAGNOSTIC_METADATA = {
     "instance_id", "inst_id", "container_id", "con_id", "sid", "serial", "serial_num", "username",
@@ -56,6 +57,9 @@ DIAGNOSTIC_METADATA = {
     "transaction_start", "undo_blocks", "undo_records", "root_blocker_name", "depth", "operation", "options",
     "cardinality", "cost", "id", "parent_id", "plan_steps", "capacity_comparable", "max_capacity_percent",
     "file_count", "autoextend_files", "elapsed_per_exec_seconds", "interval_elapsed_per_execution_seconds", "plan_steps_status",
+    "warning_percent", "critical_percent", "capacity_unknown_reason", "capacity_basis", "allocated_space_bytes",
+    "quota_scope", "physical_capacity_status",
+    "rule_status", "observation_severity",
 }
 EXECUTION_OPTION_KEYS={
     "long_session_seconds","blocking_warning_seconds","blocking_critical_seconds","blocking_critical_sessions",
@@ -333,7 +337,7 @@ def _safe_diagnostic_item(item):
     metadata={}
     for key,value in (item.get("evidence") or {}).items():
         if key not in DIAGNOSTIC_METADATA: continue
-        if key in {"sid","serial","serial_num","inst_id","instance_id","con_id","container_id","blocking_session","blocked_session","blocking_instance","blocked_instance","blocking_serial","blocked_serial","executions","plan_hash","previous_plan_hash","num_rows","blocks","sample_size","used_bytes","free_bytes","allocated_bytes","max_bytes","buffer_gets","disk_reads","rows_processed","parse_calls","depth","id","parent_id","cardinality","cost","undo_blocks","undo_records"}:
+        if key in {"sid","serial","serial_num","inst_id","instance_id","con_id","container_id","blocking_session","blocked_session","blocking_instance","blocked_instance","blocking_serial","blocked_serial","executions","plan_hash","previous_plan_hash","num_rows","blocks","sample_size","used_bytes","free_bytes","allocated_bytes","max_bytes","autoextend_headroom_bytes","effective_free_capacity_bytes","quota_used_bytes","quota_limit_bytes","physical_capacity_limit_bytes","allocated_space_bytes","buffer_gets","disk_reads","rows_processed","parse_calls","depth","id","parent_id","cardinality","cost","undo_blocks","undo_records"}:
             try: metadata[key]=int(value) if value is not None else None
             except (TypeError,ValueError): continue
         elif isinstance(value,(str,int,float,bool)) or value is None:
@@ -355,7 +359,7 @@ def _safe_diagnostic_item(item):
 
 def _safe_diagnostic_summary(value):
     if not isinstance(value,dict): return {}
-    numeric={"checks_total","checks_pass","checks_warn","checks_fail","checks_error","checks_skipped","diagnostic_observations","finding_envelopes","query_count","query_budget","capability_probe_count"}
+    numeric={"checks_total","checks_pass","checks_warn","checks_fail","checks_error","checks_skipped","diagnostic_observations","finding_envelopes","query_count","queries_executed","queries_succeeded","queries_failed","queries_skipped","query_budget","capability_probe_count"}
     result={key:_optional_int(value.get(key)) for key in numeric if value.get(key) is not None}
     for key in ("capability_discovery_seconds",):
         if value.get(key) is not None:
@@ -671,16 +675,17 @@ class AuditEvidenceService:
         row=rows[0]; row["metrics"]=_json(row.pop("metrics_json"),{}); row["evidence"]=_json(row.pop("evidence_json"),{})
         return row
 
-    def diagnostic_history(self,database_id,*,category=None,limit=200):
-        limit=max(1,min(int(limit),500)); filters=["database_id=?"]; args=[str(database_id)]
+    def diagnostic_history(self,database_id,*,category=None,limit=200,offset=0):
+        limit=max(1,min(int(limit),500)); offset=max(0,min(int(offset),1_000_000)); filters=["database_id=?"]; args=[str(database_id)]
         if category: filters.append("category=?"); args.append(str(category).upper())
         where=" AND ".join(filters)
-        rows=self.findings._rows(f"SELECT audit_run_id,database_id,category,identity_key,observed_at,inst_id,con_id,sql_id,plan_hash,owner,object_name,metrics_json,evidence_json FROM oracle_diagnostic_observations WHERE {where} ORDER BY observed_at DESC,rowid DESC LIMIT ?",(*args,limit))
+        total=self.findings._rows(f"SELECT COUNT(*) AS count FROM oracle_diagnostic_observations WHERE {where}",tuple(args))[0]["count"]
+        rows=self.findings._rows(f"SELECT audit_run_id,database_id,category,identity_key,observed_at,inst_id,con_id,sql_id,plan_hash,owner,object_name,metrics_json,evidence_json FROM oracle_diagnostic_observations WHERE {where} ORDER BY observed_at DESC,rowid DESC LIMIT ? OFFSET ?",(*args,limit,offset))
         for row in rows:
             row["metrics"]=_json(row.pop("metrics_json"),{}); row["evidence"]=_json(row.pop("evidence_json"),{})
         audits=self.findings._rows("SELECT r.audit_run_id FROM audit_runs r WHERE r.database_id=? AND EXISTS (SELECT 1 FROM rule_results q WHERE q.audit_run_id=r.audit_run_id AND q.rule_id LIKE 'ORACLE_%') ORDER BY r.started_at DESC LIMIT 1",(str(database_id),))
         latest_audit=self.audit_detail(audits[0]["audit_run_id"]) if audits else None
-        return {"items":rows,"limit":limit,"latest_audit":latest_audit}
+        return {"items":rows,"limit":limit,"offset":offset,"total":total,"latest_audit":latest_audit}
 
     def list_audits(self,*,database_id=None,status=None,trigger_type=None,limit=50,offset=0):
         limit=max(1,min(int(limit),200)); offset=max(0,int(offset)); filters=[]; args=[]

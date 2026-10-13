@@ -46,10 +46,10 @@ class ProbeConnection:
 
 class FixtureOracle:
     """Deterministic fixture for the SQL shapes; it never opens an Oracle socket."""
-    def __init__(self,config=None,*,deny_lock=False,fail_sql_stats=None,sql_plan=123,sql_elapsed=150_000_000,free_bytes=50,segment_bytes=2_000_000_000):
+    def __init__(self,config=None,*,deny_lock=False,fail_sql_stats=None,fail_capacity=None,sql_plan=123,sql_elapsed=150_000_000,free_bytes=50,segment_bytes=2_000_000_000,capacity_available=True,capacity_max_bytes=2000):
         self.config=config or {"USER":"FIXTURE","PASSWORD":"secret","DSN":"fixture"}
         self.connection=ProbeConnection(deny_lock=deny_lock); self.last_error=None
-        self.sql_plan=sql_plan; self.sql_elapsed=sql_elapsed; self.free_bytes=free_bytes; self.segment_bytes=segment_bytes; self.fail_sql_stats=fail_sql_stats
+        self.sql_plan=sql_plan; self.sql_elapsed=sql_elapsed; self.free_bytes=free_bytes; self.segment_bytes=segment_bytes; self.fail_sql_stats=fail_sql_stats; self.fail_capacity=fail_capacity
         self.queries=[]; self.closed=False
         self.now=datetime.now()
         self.sessions=[
@@ -68,8 +68,8 @@ class FixtureOracle:
         self.stats_columns=["inst_id","con_id","sql_id","object_owner","object_name","object_type","partition_name","last_analyzed","stale_stats","num_rows","blocks","sample_size"]
         self.segment_rows=[("APP","ORDERS",None,"TABLE","APP_DATA",segment_bytes)]
         self.segment_columns=["owner","segment_name","partition_name","segment_type","tablespace_name","segment_bytes"]
-        self.space_rows=[(5,"APP_DATA","PERMANENT",1000,2000,free_bytes,1,1)]
-        self.space_columns=["con_id","tablespace_name","contents","allocated_bytes","max_bytes","free_bytes","file_count","autoextend_files"]
+        self.space_rows=[(5,"APP_DATA","PERMANENT",1000,capacity_max_bytes,free_bytes,1,1,None,None,0)] if capacity_available else [(5,"APP_DATA","PERMANENT",0,0,None,0,0,None,None,0)]
+        self.space_columns=["con_id","tablespace_name","contents","allocated_bytes","max_bytes","free_bytes","file_count","autoextend_files","quota_used_bytes","quota_limit_bytes","quota_unlimited"]
         self.temp_rows=[(5,"TEMP",1000,1500,100,900,90,60,900,1,1)]
         self.temp_columns=["con_id","tablespace_name","allocated_bytes","max_bytes","free_bytes","used_bytes","used_percent","max_capacity_percent","allocated_space","file_count","autoextend_files"]
 
@@ -82,6 +82,8 @@ class FixtureOracle:
         if self.connection.deny_lock and "join gv$lock l" in query: self.last_error="ORA-01031: insufficient privileges"; return None,None
         if self.fail_sql_stats and any(view in query for view in ("from gv$sqlstats","from v$sqlstats","from gv$sql ","from v$sql ")):
             self.last_error=self.fail_sql_stats; return None,None
+        if self.fail_capacity and "from dba_tablespaces" in query:
+            self.last_error=self.fail_capacity; return None,None
         if "join gv$lock l" in query: return self.lock_rows,["blocking_instance","blocking_session","blocking_con_id","blocked_instance","blocked_session","blocked_con_id","lock_type","lock_wait_seconds"]
         if "join v$lock l" in query: return [(1,128,None,1,205,None,"TX",60)],["blocking_instance","blocking_session","blocking_con_id","blocked_instance","blocked_session","blocked_con_id","lock_type","lock_wait_seconds"]
         if "from gv$session s" in query: return self.sessions,self.session_columns
@@ -132,12 +134,27 @@ def test_diagnostic_queries_are_bounded_read_only_and_cover_oracle_domains():
     assert results["ORACLE_OBJECT_STATISTICS"]["status"]=="WARN"
     assert results["ORACLE_CAPACITY"]["status"]=="FAIL"
     assert results["ORACLE_TEMP_CAPACITY"]["status"]=="WARN"
+    session_observation=next(item for item in report["diagnostic_observations"] if item["category"]=="SESSION")
+    blocker_observation=next(item for item in report["diagnostic_observations"] if item["category"]=="BLOCKING")
+    assert session_observation["evidence"]["rule_status"]=="PASS"
+    assert session_observation["evidence"]["observation_severity"]=="MEDIUM"
+    assert blocker_observation["evidence"]["rule_status"]=="FAIL"
+    assert blocker_observation["evidence"]["observation_severity"]=="CRITIC"
     blocker=next(item for item in report["finding_envelopes"] if item["check_id"]=="ORACLE_BLOCKING")
     assert "inst=1:con=5:sid=128:serial=900"==blocker["object_name"]
     assert len(blocker["evidence"]["chain"])==3
     assert report["capability_snapshot"]["rac_instance_count"]==2
     assert report["capability_snapshot"]["cdb_mode"]=="CDB"
     assert report["summary"]["query_count"]<=report["summary"]["query_budget"]
+    assert report["summary"]["queries_executed"]==report["summary"]["query_count"]
+    assert report["summary"]["queries_succeeded"]==report["summary"]["query_count"]
+    assert report["summary"]["queries_failed"]==0
+    capacity=next(item for item in report["diagnostic_observations"] if item["category"]=="CAPACITY" and item["object_name"]=="APP_DATA")
+    assert capacity["metrics"]["assigned_space_used_percent"]==95
+    assert capacity["metrics"]["effective_capacity_used_percent"]==47.5
+    assert capacity["metrics"]["autoextend_headroom_bytes"]==1000
+    assert capacity["metrics"]["physical_capacity_limit_bytes"] is None
+    assert not any(item["check_id"]=="ORACLE_CAPACITY_MAX" for item in report["finding_envelopes"])
     assert len(report["diagnostic_observations"])<=500
     assert report["summary"]["capability_probe_count"]>report["summary"]["query_count"]
     assert all(query.startswith("select") for query,_ in db.queries)
@@ -183,8 +200,18 @@ def test_authoritative_diagnostics_persist_findings_investigations_and_plan_hist
     all_hypotheses=[hypothesis for case in cases for hypothesis in investigations.hypotheses(case["id"])]
     assert any(item["hypothesis_type"]=="PLAN_CHANGE_MAY_CONTRIBUTE" for item in all_hypotheses)
     assert any("does not establish causation" in item["description"] for item in all_hypotheses)
-    assert evidence.audit_detail("diag-2")["diagnostic_observations"]
+    persisted_observations=evidence.audit_detail("diag-2")["diagnostic_observations"]
+    assert persisted_observations
+    persisted_capacity=next(item for item in persisted_observations if item["category"]=="CAPACITY" and item["object_name"]=="APP_DATA")
+    assert persisted_capacity["metrics"]["assigned_space_used_percent"]==97
+    assert persisted_capacity["metrics"]["effective_capacity_used_percent"]==48.5
+    assert persisted_capacity["metrics"]["autoextend_headroom_bytes"]==1000
+    assert persisted_capacity["evidence"]["warning_percent"]==80
+    assert persisted_capacity["evidence"]["rule_status"]=="FAIL"
+    assert persisted_capacity["evidence"]["observation_severity"]=="CRITIC"
     assert evidence.diagnostic_history("DWH-TEST",category="PLAN")["items"][0]["sql_id"]=="sqla"
+    paginated=evidence.diagnostic_history("DWH-TEST",category="PLAN",limit=1,offset=1)
+    assert paginated["total"]==2 and paginated["offset"]==1 and len(paginated["items"])==1
     assert first_plan["plan_hash"]=="123"
     plan_findings=[item for item in findings.list_findings(database="DWH-TEST") if item["rule_id"]=="ORACLE_PLAN_CHANGES"]
     assert plan_findings
@@ -200,6 +227,7 @@ def test_privilege_loss_skips_blocking_and_never_resolves_existing_finding(store
     result=next(item for item in limited["rule_results"] if item["rule_id"]=="ORACLE_BLOCKING")
     assert result["status"]=="SKIPPED"
     assert limited["capability_snapshot"]["capabilities"]["LOCK_VISIBILITY"]=="INSUFFICIENT_PRIVILEGES"
+    assert limited["summary"]["queries_skipped"]==1
     persist(evidence,limited)
     assert findings.get_finding(prior["id"])["status"]!="RESOLVED"
     assert evidence.audit_detail("lock-revoked")["coverage_state"] in {"DEGRADED","PARTIAL"}
@@ -259,6 +287,51 @@ def test_tablespace_capacity_finding_lifecycle_tracks_warning_critical_and_recov
         elif audit_id=="cap-warning": assert rows and rows[0]["status"]!="RESOLVED" and rows[0]["severity"]=="MEDIUM"
         elif audit_id=="cap-critical": assert rows and rows[0]["severity"]=="CRITICAL"
         else: assert rows and rows[0]["status"]=="RESOLVED"
+
+
+def test_capacity_unknown_is_not_zero_and_does_not_resolve_prior_capacity_finding(stores):
+    _,_,findings,_,_,evidence=stores
+    known=run(FixtureOracle(free_bytes=50,capacity_max_bytes=1100),audit_id="capacity-known",service=evidence)
+    persist(evidence,known)
+    prior=next(item for item in findings.list_findings(database="DWH-TEST") if item["rule_id"]=="ORACLE_CAPACITY")
+    prior_effective=next(item for item in findings.list_findings(database="DWH-TEST") if item["rule_id"]=="ORACLE_CAPACITY_MAX")
+    unknown=run(FixtureOracle(capacity_available=False),audit_id="capacity-unknown",service=evidence)
+    capacity=next(item for item in unknown["diagnostic_observations"] if item["category"]=="CAPACITY" and item["object_name"]=="APP_DATA")
+    assert capacity["metrics"]["capacity_known"] is False
+    assert capacity["metrics"]["used_percent"] is None
+    assert capacity["metrics"]["max_capacity_percent"] is None
+    assert next(item for item in unknown["rule_results"] if item["rule_id"]=="ORACLE_CAPACITY")["status"]=="SKIPPED"
+    assert next(item for item in unknown["rule_results"] if item["rule_id"]=="ORACLE_CAPACITY_MAX")["status"]=="SKIPPED"
+    assert unknown["summary"]["queries_skipped"]==1
+    assert unknown["coverage_state"]=="DEGRADED"
+    persist(evidence,unknown)
+    assert findings.get_finding(prior["id"])["status"]!="RESOLVED"
+    assert findings.get_finding(prior_effective["id"])["status"]!="RESOLVED"
+
+
+def test_capacity_query_error_keeps_both_assigned_and_effective_capacity_findings(stores):
+    _,_,findings,_,_,evidence=stores
+    visible=run(FixtureOracle(free_bytes=50,capacity_max_bytes=1100),audit_id="capacity-query-visible",service=evidence)
+    persist(evidence,visible)
+    prior={item["rule_id"]:item for item in findings.list_findings(database="DWH-TEST") if item["rule_id"] in {"ORACLE_CAPACITY","ORACLE_CAPACITY_MAX"}}
+    assert set(prior)=={"ORACLE_CAPACITY","ORACLE_CAPACITY_MAX"}
+    failed=run(FixtureOracle(fail_capacity="ORA-01013: user requested cancel"),audit_id="capacity-query-error",service=evidence,trigger="SCHEDULED")
+    assert next(item for item in failed["rule_results"] if item["rule_id"]=="ORACLE_CAPACITY")["status"]=="ERROR"
+    assert next(item for item in failed["rule_results"] if item["rule_id"]=="ORACLE_CAPACITY_MAX")["status"]=="ERROR"
+    persist(evidence,failed)
+    for rule_id,finding in prior.items():
+        assert findings.get_finding(finding["id"])["status"]!="RESOLVED",rule_id
+
+
+def test_capacity_queries_distinguish_permanent_quota_and_temporary_capacity():
+    from src.api.oracle_diagnostics import _tablespace_query,_temporary_tablespace_query
+    permanent,_=_tablespace_query({"CDB_VISIBILITY":"AVAILABLE"})
+    temporary,_=_temporary_tablespace_query({"CDB_VISIBILITY":"AVAILABLE"})
+    assert "USER_TS_QUOTAS" in permanent.upper()
+    assert "AS MAX_CAPACITY_PERCENT" in permanent.upper()
+    assert "SUM(BYTES) ALLOCATED_BYTES" in temporary.upper()
+    assert "T.ALLOCATED_SPACE" in temporary.upper()
+    assert "DBA_TEMP_FILES" in temporary.upper()
 
 
 def test_retention_protects_diagnostic_evidence_referenced_by_active_investigation(stores,tmp_path):

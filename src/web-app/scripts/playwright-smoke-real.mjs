@@ -184,6 +184,10 @@ async function clickSubtab(page, name) {
 }
 
 async function runRealSmoke(page) {
+  let oracleDiagnosticRuns = 0;
+  page.on('request', (request) => {
+    if (request.url().includes('/api/audit/oracle-diagnostics/run') && request.method() === 'POST') oracleDiagnosticRuns += 1;
+  });
   await logStep('goto app');
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
 
@@ -203,12 +207,61 @@ async function runRealSmoke(page) {
 
   await logStep('Oracle diagnostics evidence through real API and SQLite fixture');
   await clickSubtab(page, 'Diagnòstics Oracle');
-  await verifyText(page, 'Oracle Deep Diagnostics');
+  await verifyText(page, 'Diagnòstics Oracle en profunditat');
+  await verifyText(page, 'Resum executiu');
   await verifyText(page, 'AUD-SCH-PLAYWRIGHT-DIAGNOSTICS');
-  await verifyText(page, 'Root blocker');
-  await verifyText(page, 'SID 128');
-  await verifyText(page, 'NOT_LICENSED');
-  await page.getByRole('button', { name: /Finding #\d+ · CRITICAL/ }).first().click();
+  await page.locator('[aria-label="Observacions: Bloquejos"] .oracle-observation summary').first().click();
+  await verifyText(page, 'Bloquejador arrel');
+  await verifyText(page, 'sid=128');
+  await verifyText(page, 'Sense llicència declarada');
+  await page.locator('[aria-label="Observacions: Emmagatzematge"] .oracle-observation summary').filter({ hasText: 'APP_DATA' }).click();
+  await verifyText(page, 'Ocupació de l’espai assignat');
+  await verifyText(page, '47,5%');
+  await verifyText(page, 'Marge d’autoextensió: 1.000 bytes');
+  await verifyText(page, 'Llindars: avís 80% · crític 95%');
+
+  await logStep('Oracle diagnostics WCAG AA control contrast and focus');
+  const accessibility = await page.evaluate(() => {
+    const parse = (color) => {
+      const values = color.match(/[\d.]+/g)?.map(Number) || [];
+      return values.length >= 3 ? values.slice(0, 3).map((value) => value / 255).map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4) : null;
+    };
+    const luminance = (rgb) => rgb ? rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722 : null;
+    const ratio = (foreground, background) => {
+      const a = luminance(parse(foreground)); const b = luminance(parse(background));
+      if (a === null || b === null) return 0;
+      return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    };
+    const select = document.querySelector('.oracle-diagnostics .oracle-select');
+    const run = document.querySelector('.oracle-diagnostics .oracle-run-button');
+    const option = select?.querySelector('option:checked');
+    if (!select || !run || !option) throw new Error('No s’han trobat els controls Oracle visibles.');
+    const selectStyle = getComputedStyle(select); const runStyle = getComputedStyle(run); const optionStyle = getComputedStyle(option);
+    const normal = ratio(selectStyle.color, selectStyle.backgroundColor);
+    const selected = ratio(optionStyle.color, optionStyle.backgroundColor);
+    const button = ratio(runStyle.color, runStyle.backgroundColor);
+    select.disabled = true;
+    const disabledStyle = getComputedStyle(select);
+    const disabled = ratio(disabledStyle.color, disabledStyle.backgroundColor);
+    select.disabled = false;
+    select.focus();
+    const focusedStyle = getComputedStyle(select);
+    const focusWidth = Number.parseFloat(focusedStyle.outlineWidth) || 0;
+    const focusContrast = ratio(focusedStyle.outlineColor, focusedStyle.backgroundColor);
+    return { normal, selected, disabled, button, focusWidth, focusContrast };
+  });
+  if (accessibility.normal < 4.5 || accessibility.selected < 4.5 || accessibility.disabled < 4.5 || accessibility.button < 4.5 || accessibility.focusWidth < 2 || accessibility.focusContrast < 3) {
+    throw new Error(`Contrast Oracle insuficient: ${JSON.stringify(accessibility)}`);
+  }
+  await logStep(`Oracle diagnostic control contrast ${JSON.stringify(accessibility)}`);
+  await page.screenshot({ path: path.join(repoRoot, 'docs', 'E13DB_013_UX_ORACLE_DIAGNOSTICS.png'), fullPage: true });
+
+  const [historyRefresh] = await Promise.all([
+    page.waitForResponse((response) => response.url().includes('/api/oracle-diagnostics/E13DB/history') && response.request().method() === 'GET' && response.ok(), { timeout: 15000 }),
+    page.getByRole('button', { name: 'Actualitza' }).click(),
+  ]);
+  if (!historyRefresh.ok() || oracleDiagnosticRuns !== 0) throw new Error('Actualitza no ha d’iniciar una nova execució del diagnòstic.');
+  await page.getByRole('button', { name: /Incidència #\d+ · Crítica/ }).first().click();
   await page.getByRole('dialog', { name: 'Finding detail' }).waitFor({ state: 'visible', timeout: 15000 });
   await page.getByRole('button', { name: /Open investigation for this Finding/i }).click();
   await verifyText(page, 'Investigations');
@@ -370,6 +423,8 @@ async function main() {
     browser = await launchBrowser(logStep);
     const context = await browser.newContext({ acceptDownloads: true });
     const page = await context.newPage();
+    page.on('pageerror', (error) => { logStep(`browser page error: ${error.stack || error}`).catch(() => {}); });
+    page.on('console', (message) => { if (message.type() === 'error') logStep(`browser console error: ${message.text()}`).catch(() => {}); });
     await page.addInitScript(() => {
       window.__downloadEvents = [];
       const originalClick = HTMLAnchorElement.prototype.click;
